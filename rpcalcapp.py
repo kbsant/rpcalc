@@ -2,10 +2,6 @@ from bottle import Bottle, run, static_file
 
 app = Bottle()
 
-@app.route('/hello')
-def hello():
-    return "Hello World!"
-
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root='./web/static/')
