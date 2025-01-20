@@ -10,15 +10,15 @@
     :display-number 0.0
     :display-precision 4}))
 
-(defn svg-style []
+(def svg-style
   [:style """
   .frame {fill: rgb(0,20,40)}
   .lcdisplay rect {fill: rgb(120,140,120)}
-  .fg-btn {font: 20px sans-serif; fill:white;}
+  .fg-btn {font-family: sans-serif; fill:white;}
   .fg-btn rect {fill: black; stroke: gold;}
-  .fg-btn text.ftext {stroke:orange;}
-  .fg-btn text.mtext {stroke:white;}
-  .fg-btn text.gtext {stroke:blue;}
+  .fg-btn text.ftext {font-size: 18px;stroke:orange;}
+  .fg-btn text.mtext {font-size: 22px;stroke:white;}
+  .fg-btn text.gtext {font-size: 20px;stroke:blue;}
   text.ntext {font: 90px monospace; fill:dimgray; stroke:black;}
   """ ])
 
@@ -26,36 +26,54 @@
   (fn [] (swap! state update :raw-input #(str % n))))
 
 (def btn-info
-  {:f-n   {:x 50 :y 110 :ftext "AMORT" :mtext "n" :gtext "12x"}
-   :f-i   {:x 200 :y 110 :ftext "INT" :mtext "i" :gtext "12÷"}
-   :f-pv  {:x 350 :y 110 :ftext "NPV" :mtext "PV" :gtext "CFo"}
-   :f-pmt {:x 500 :y 110 :ftext "RND" :mtext "PMT" :gtext "CFj"}
-   :f-fv  {:x 650 :y 110 :ftext "IRR" :mtext "FV" :gtext "Nj"}
-   :f-chs {:x 800 :y 110 :ftext "RPN" :mtext "CHS" :gtext "DATE"}
-   :n-7   {:x 950 :y 110 :ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler 7)}
-   :n-8  {:x 1100 :y 110 :ftext "" :mtext "8" :gtext "END" :nfn (num-handler 8)}
-   :n-9  {:x 1250 :y 110 :ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler 9)}
-   :n-v  {:x 1400 :y 110 :ftext "" :mtext "÷" :gtext "⤶"}
-   :n-4   {:x 950 :y 210 :ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler 4)}
-   :n-5   {:x 1100 :y 210 :ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler 5)}
-   :n-6   {:x 1250 :y 210 :ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler 6)}
-   :n-x   {:x 1400 :y 210 :ftext "" :mtext "x" :gtext "x²"}
-   :n-1   {:x 950 :y 310 :ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler 1)}
-   :n-2   {:x 1100 :y 310 :ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler 2)}
-   :n-3   {:x 1250 :y 310 :ftext "" :mtext "3" :gtext "n!" :nfn (num-handler 3)}
-   :n-m   {:x 1400 :y 310 :ftext "" :mtext "-" :gtext "←"}
-   :n-0   {:x 950 :y 410 :ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler 0)}
-   :n-d   {:x 1100 :y 410 :ftext "" :mtext "." :gtext "S" :nfn (num-handler ".")}
-   :n-S   {:x 1250 :y 410 :ftext "" :mtext "Σ+" :gtext "Σ-"}
-   :n-p   {:x 1400 :y 410 :ftext "" :mtext "+" :gtext "LSTx"}
+  {
+   :f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"}
+   :f-i   {:ftext "INT" :mtext "i" :gtext "12÷"}
+   :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"}
+   :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
+   :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
+   :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"}
+   :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler 7)}
+   :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler 8)}
+   :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler 9)}
+   :n-v   {:ftext "" :mtext "÷" :gtext "⤶"}
+   :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"}
+   :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ"}
+   :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN"}
+   :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
+   :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"}
+   :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS"}
+   :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler 4)}
+   :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler 5)}
+   :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler 6)}
+   :n-x   {:ftext "" :mtext "x" :gtext "x²"}
+   :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
+   :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
+   :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
+   :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y"}
+   :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0"}
+   :f-entr {:ftext "PREFIX" :mtext "E\nN" :gtext "="}
+   :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler 1)}
+   :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler 2)}
+   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler 3)}
+   :n-m   {:ftext "" :mtext "-" :gtext "←"}
+   :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
+   :f-f   {:ftext "" :mtext "f" :gtext ""}
+   :f-g   {:ftext "" :mtext "g" :gtext ""}
+   :f-sto {:ftext "" :mtext "STO" :gtext "("}
+   :f-rcl {:ftext ""  :mtext "RCL" :gtext ")"}
+   :f-nop {:draw-fn #(vector :g)}
+   :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler 0)}
+   :n-d   {:ftext "" :mtext "." :gtext "S" :nfn (num-handler ".")}
+   :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
+   :n-p   {:ftext "" :mtext "+" :gtext "LSTx"}
    })
 
 (def btn-keys
   {:row-0 [:f-n :f-i :f-pv :f-pmt :f-fv :f-chs :n-7 :n-8 :n-9 :n-v]
-   :row-1 [:n-4 :n-5 :n-6 :n-x]
-   :row-2 [:n-1 :n-2 :n-3 :n-m]
-   :row-3 [:n-0 :n-d :n-S :n-p]
-   })
+   :row-1 [:f-exp :f-inv :f-pctt :f-pctd :f-pct :f-eex :n-4 :n-5 :n-6 :n-x]
+   :row-2 [:f-rs :f-sst :f-run :f-x-y :f-clx :f-entr :n-1 :n-2 :n-3 :n-m]
+   :row-3 [:f-on :f-f :f-g :f-sto :f-rcl :f-nop :n-0 :n-d :n-S :n-p]})
 
 (defn format-prec-float [precision n]
   (pprint/cl-format nil (str "~," precision "f") n))
@@ -78,20 +96,31 @@
      [:text.mtext {:x (x-fn mtext) :y (+ 80 y) } mtext]
      [:text.gtext {:x (x-fn gtext) :y (+ 115 y) } gtext]]))
 
+(defn render-buttons []
+  (into
+   [:g]
+   (for [[r row-id] (map-indexed vector [:row-0 :row-1 :row-2 :row-3])
+         [c btn-key] (map-indexed vector (row-id btn-keys))]
+     (let [btn-i (merge {:x (+ 50 (* 150 c))
+                         :y (+ 110 (* 135 r))
+                         :draw-fn btn}
+                        (btn-key btn-info))
+           draw-fn (:draw-fn btn-i)]
+       (draw-fn btn-i)))))
+
+(def printed-buttons (render-buttons))
+
 (defn frame [state-info]
   [:svg {:width "100%" :viewBox "0 0 1500 1000"}
-   (svg-style)
+   svg-style
    [:rect.frame {:width "100%" :height "100%"}]
    (lcdisplay (get-display-num state-info))
-   (into [:g]
-    (for [row-id [:row-0 :row-1 :row-2 :row-3]
-          btn-key (row-id btn-keys)]
-      (btn (btn-key btn-info))))])
+   printed-buttons])
 
 (defn my-component []
-(let [state-info @state]
-  [:div {:style {:color "silver" :background-color "black" :font "9pt sans-serif"}}
-   [:p "This site is an exercise - for educational purposes only."]
-   [:div (frame state-info)]]))
+  (let [state-info @state]
+    [:div {:style {:color "silver" :background-color "black" :font "9pt sans-serif"}}
+     [:p "This site is an exercise - for educational purposes only."]
+     [:div (frame state-info)]]))
 
 (rdom/render [my-component] (.getElementById js/document "app"))
