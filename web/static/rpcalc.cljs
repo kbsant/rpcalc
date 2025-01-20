@@ -19,11 +19,29 @@
   .fg-btn text.ftext {font-size: 18px;stroke:orange;}
   .fg-btn text.mtext {font-size: 22px;stroke:white;}
   .fg-btn text.gtext {font-size: 20px;stroke:blue;}
+  .sh-btn {font-family: sans-serif; fill:navy;}
+  .sh-btn text {font-size: 32px;fill: black; stroke: navy;}
+  .sh-btn rect.f-btn {fill: orange; stroke: white;}
+  .sh-btn rect.g-btn {fill: dodgerblue; stroke: white;}
   text.ntext {font: 90px monospace; fill:dimgray; stroke:black;}
   """ ])
 
 (defn num-handler [n]
   (fn [] (swap! state update :raw-input #(str % n))))
+
+(defn btn [{:keys [x y height ftext mtext gtext nfn] :or {height 80}}]
+  (let [x-fn #(- (+ x 20) (* 5 (count %)))]
+    [:g.fg-btn
+     [:text.ftext {:x (x-fn ftext) :y (+ 30 y) } ftext]
+     [:rect {:on-click nfn :x (- x 20) :y (+ 40 y) :width 90 :height height}]
+     [:text.mtext {:x (x-fn mtext) :y (+ 80 y) } mtext]
+     [:text.gtext {:x (x-fn gtext) :y (+ height 35 y) } gtext]]))
+
+(defn shift-btn [{:keys [x y mtext nfn rect-class]}]
+  (let [x-fn #(- (+ x 20) (* 5 (count %)))]
+    [:g.sh-btn
+     [rect-class {:on-click nfn :x (- x 20) :y (+ 40 y) :width 90 :height 80}]
+     [:text {:x (x-fn mtext) :y (+ 90 y) } mtext]]))
 
 (def btn-info
   {
@@ -52,14 +70,14 @@
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
    :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y"}
    :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0"}
-   :f-entr {:ftext "PREFIX" :mtext "E\nN" :gtext "="}
+   :f-entr {:ftext "PREFIX" :mtext "E\nN" :gtext "=" :height 220}
    :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler 1)}
    :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler 2)}
    :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler 3)}
    :n-m   {:ftext "" :mtext "-" :gtext "←"}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
-   :f-f   {:ftext "" :mtext "f" :gtext ""}
-   :f-g   {:ftext "" :mtext "g" :gtext ""}
+   :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn}
+   :f-g   {:draw-fn shift-btn :mtext "g" :rect-class :rect.g-btn}
    :f-sto {:ftext "" :mtext "STO" :gtext "("}
    :f-rcl {:ftext ""  :mtext "RCL" :gtext ")"}
    :f-nop {:draw-fn #(vector :g)}
@@ -87,14 +105,6 @@
   [:g.lcdisplay
    [:rect {:x 50 :y 10 :width 1300 :height 100}]
    [:text.ntext {:x 55 :y 80 } ntext]])
-
-(defn btn [{:keys [x y height ftext mtext gtext nfn]}]
-  (let [x-fn #(- (+ x 20) (* 5 (count %)))]
-    [:g.fg-btn
-     [:text.ftext {:x (x-fn ftext) :y (+ 30 y) } ftext]
-     [:rect {:on-click nfn :x (- x 20) :y (+ 40 y) :width 90 :height (or height 80)}]
-     [:text.mtext {:x (x-fn mtext) :y (+ 80 y) } mtext]
-     [:text.gtext {:x (x-fn gtext) :y (+ 115 y) } gtext]]))
 
 (defn render-buttons []
   (into
