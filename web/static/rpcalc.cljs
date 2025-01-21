@@ -26,7 +26,24 @@
   text.ntext {font: 90px monospace; fill:dimgray; stroke:black;}
   """ ])
 
-(defn num-handler [n]
+
+(defn clx-handler []
+  (swap! state assoc :raw-input "" :display-number 0.0))
+
+(defn enter-helper [{r :raw-input :as state-info}]
+  (-> state-info (assoc :raw-input "") (assoc :display-number (double r))))
+
+(defn enter-handler []
+  (swap! state enter-helper))
+
+(defn decimal-pt-handler []
+  (let [dp-if-none #(cond
+                      (string/blank? %) "0."
+                      (string/includes? % ".") %
+                      :else (str % "."))]
+    (swap! state update :raw-input dp-if-none)))
+
+(defn num-handler-fn [n]
   (fn [] (swap! state update :raw-input #(str % n))))
 
 (defn btn [{:keys [x y height ftext mtext gtext nfn] :or {height 80}}]
@@ -51,9 +68,9 @@
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"}
-   :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler 7)}
-   :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler 8)}
-   :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler 9)}
+   :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7)}
+   :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8)}
+   :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9)}
    :n-v   {:ftext "" :mtext "÷" :gtext "⤶"}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ"}
@@ -61,19 +78,19 @@
    :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"}
    :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS"}
-   :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler 4)}
-   :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler 5)}
-   :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler 6)}
+   :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4)}
+   :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5)}
+   :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6)}
    :n-x   {:ftext "" :mtext "x" :gtext "x²"}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
    :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y"}
-   :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0"}
-   :f-entr {:ftext "PREFIX" :mtext "E\nN" :gtext "=" :height 220}
-   :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler 1)}
-   :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler 2)}
-   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler 3)}
+   :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0" :nfn clx-handler}
+   :f-entr {:ftext "PREFIX" :mtext "E\nN" :gtext "=" :height 220 :nfn enter-handler}
+   :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1)}
+   :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2)}
+   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3)}
    :n-m   {:ftext "" :mtext "-" :gtext "←"}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
    :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn}
@@ -81,8 +98,8 @@
    :f-sto {:ftext "" :mtext "STO" :gtext "("}
    :f-rcl {:ftext ""  :mtext "RCL" :gtext ")"}
    :f-nop {:draw-fn #(vector :g)}
-   :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler 0)}
-   :n-d   {:ftext "" :mtext "." :gtext "S" :nfn (num-handler ".")}
+   :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0)}
+   :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
    :n-p   {:ftext "" :mtext "+" :gtext "LSTx"}
    })
