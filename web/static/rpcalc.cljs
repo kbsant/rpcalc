@@ -7,7 +7,7 @@
 (def state
   (r/atom
    {:raw-input ""
-    :display-number 0.0
+    :operand-stack [0.0]
     :display-precision 4}))
 
 (def svg-style
@@ -26,12 +26,20 @@
   text.ntext {font: 90px monospace; fill:dimgray; stroke:black;}
   """ ])
 
+(defn number [n]
+  (js/Number. n))
+
+(defn peekz [stack]
+  (or (peek stack) 0.0))
+
+(defn numberz [s]
+  (if (string/blank? s) 0.0 (number s)))
 
 (defn clx-handler []
-  (swap! state assoc :raw-input "" :display-number 0.0))
+  (swap! state assoc :raw-input "" :operand-stack [0.0]))
 
 (defn enter-helper [{r :raw-input :as state-info}]
-  (-> state-info (assoc :raw-input "") (assoc :display-number (double r))))
+  (-> state-info (assoc :raw-input "") (update :operand-stack conj (numberz r))))
 
 (defn enter-handler []
   (swap! state enter-helper))
@@ -45,6 +53,28 @@
 
 (defn num-handler-fn [n]
   (fn [] (swap! state update :raw-input #(str % n))))
+
+(defn replace-with-result [state-info result]
+  (-> state-info
+        (assoc :raw-input "")
+        (update :operand-stack #(-> % (pop) (conj result)))))
+
+(defn unary-op-helper [op {:keys [operand-stack raw-input] :as state-info}]
+  (let [n (if (string/blank? raw-input)
+            (peekz operand-stack)
+            (numberz raw-input))]
+    (replace-with-result state-info (op n))))
+
+(defn unary-op-fn [op]
+  (fn [] (swap! state (partial unary-op-helper op))))
+
+(defn binary-op-helper [op {:keys [operand-stack raw-input] :as state-info}]
+  (let [lhs (peekz operand-stack)
+        rhs (numberz raw-input)]
+    (replace-with-result state-info (op lhs rhs))))
+
+(defn binary-op-fn [op]
+  (fn [] (swap! state (partial binary-op-helper op))))
 
 (defn btn [{:keys [x y height ftext mtext gtext nfn] :or {height 80}}]
   (let [x-fn #(- (+ x 20) (* 5 (count %)))]
@@ -67,11 +97,11 @@
    :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"}
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
-   :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"}
+   :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE" :nfn (unary-op-fn #(* -1 %))}
    :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7)}
    :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8)}
    :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9)}
-   :n-v   {:ftext "" :mtext "÷" :gtext "⤶"}
+   :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (binary-op-fn /)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ"}
    :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN"}
@@ -81,7 +111,7 @@
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4)}
    :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5)}
    :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6)}
-   :n-x   {:ftext "" :mtext "x" :gtext "x²"}
+   :n-mul {:ftext "" :mtext "x" :gtext "x²" :nfn (binary-op-fn *)}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
@@ -91,7 +121,7 @@
    :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1)}
    :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2)}
    :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3)}
-   :n-m   {:ftext "" :mtext "-" :gtext "←"}
+   :n-sub {:ftext "" :mtext "-" :gtext "←" :nfn (binary-op-fn -)}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
    :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn}
    :f-g   {:draw-fn shift-btn :mtext "g" :rect-class :rect.g-btn}
@@ -101,21 +131,21 @@
    :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0)}
    :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
-   :n-p   {:ftext "" :mtext "+" :gtext "LSTx"}
+   :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (binary-op-fn +)}
    })
 
 (def btn-keys
-  {:row-0 [:f-n :f-i :f-pv :f-pmt :f-fv :f-chs :n-7 :n-8 :n-9 :n-v]
-   :row-1 [:f-exp :f-inv :f-pctt :f-pctd :f-pct :f-eex :n-4 :n-5 :n-6 :n-x]
-   :row-2 [:f-rs :f-sst :f-run :f-x-y :f-clx :f-entr :n-1 :n-2 :n-3 :n-m]
-   :row-3 [:f-on :f-f :f-g :f-sto :f-rcl :f-nop :n-0 :n-d :n-S :n-p]})
+  {:row-0 [:f-n :f-i :f-pv :f-pmt :f-fv :f-chs :n-7 :n-8 :n-9 :n-div]
+   :row-1 [:f-exp :f-inv :f-pctt :f-pctd :f-pct :f-eex :n-4 :n-5 :n-6 :n-mul]
+   :row-2 [:f-rs :f-sst :f-run :f-x-y :f-clx :f-entr :n-1 :n-2 :n-3 :n-sub]
+   :row-3 [:f-on :f-f :f-g :f-sto :f-rcl :f-nop :n-0 :n-d :n-S :n-add]})
 
 (defn format-prec-float [precision n]
   (pprint/cl-format nil (str "~," precision "f") n))
 
-(defn get-display-num[{:keys [display-number display-precision raw-input]}] 
+(defn get-display-num[{:keys [operand-stack display-precision raw-input]}] 
   (if (string/blank? raw-input)
-    (format-prec-float display-precision display-number)
+    (format-prec-float display-precision (peekz operand-stack))
     raw-input))
 
 (defn lcdisplay [ntext]
