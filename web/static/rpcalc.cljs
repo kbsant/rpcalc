@@ -8,7 +8,9 @@
   (r/atom
    {:raw-input ""
     :operand-stack [0.0]
-    :display-precision 4}))
+    :display-precision 4
+    :flags {}
+    :shift ""}))
 
 (def svg-style
   [:style """
@@ -24,6 +26,7 @@
   .sh-btn rect.f-btn {fill: orange; stroke: white;}
   .sh-btn rect.g-btn {fill: dodgerblue; stroke: white;}
   text.ntext {font: 90px monospace; fill:dimgray; stroke:black;}
+  text.stext {font: 30px monospace; fill:black; stroke:black;}
   """ ])
 
 (defn number [n]
@@ -76,6 +79,12 @@
 (defn binary-op-fn [op]
   (fn [] (swap! state (partial binary-op-helper op))))
 
+(defn toggle-flag-fn [f]
+  (fn [] (swap! state #(update-in % [:flags f] not))))
+
+(defn toggle-shift-fn [s]
+  (fn [] (swap! state #(update % :shift (fn [e] (if (= s e) "" s))))))
+
 (defn btn [{:keys [x y height ftext mtext gtext nfn] :or {height 80}}]
   (let [x-fn #(- (+ x 20) (* 5 (count %)))]
     [:g.fg-btn
@@ -123,8 +132,8 @@
    :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3)}
    :n-sub {:ftext "" :mtext "-" :gtext "←" :nfn (binary-op-fn -)}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
-   :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn}
-   :f-g   {:draw-fn shift-btn :mtext "g" :rect-class :rect.g-btn}
+   :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn :nfn (toggle-shift-fn :f)}
+   :f-g   {:draw-fn shift-btn :mtext "g" :rect-class :rect.g-btn :nfn (toggle-shift-fn :g)}
    :f-sto {:ftext "" :mtext "STO" :gtext "("}
    :f-rcl {:ftext ""  :mtext "RCL" :gtext ")"}
    :f-nop {:draw-fn #(vector :g)}
@@ -148,10 +157,13 @@
     (format-prec-float display-precision (peekz operand-stack))
     raw-input))
 
-(defn lcdisplay [ntext]
+(defn lcdisplay [{:keys [flags shift] :as state-info}]
   [:g.lcdisplay
    [:rect {:x 50 :y 10 :width 1300 :height 100}]
-   [:text.ntext {:x 55 :y 80 } ntext]])
+   [:text.ntext {:x 55 :y 80 } (get-display-num state-info)]
+   [:text.stext {:x 1300 :y 40 } (when shift (name shift))]
+   [:text.stext {:x 1300 :y 40 } (when (:d-m-y flags) "D.MY")]
+   ])
 
 (defn render-buttons []
   (into
@@ -171,7 +183,7 @@
   [:svg {:width "100%" :viewBox "0 0 1500 1000"}
    svg-style
    [:rect.frame {:width "100%" :height "100%"}]
-   (lcdisplay (get-display-num state-info))
+   (lcdisplay state-info)
    printed-buttons])
 
 (defn my-component []
