@@ -10,7 +10,7 @@
     :operand-stack [0.0]
     :display-precision 4
     :flags {}
-    :shift ""}))
+    :shift :none}))
 
 (def svg-style
   [:style """
@@ -83,13 +83,24 @@
   (fn [] (swap! state #(update-in % [:flags f] not))))
 
 (defn toggle-shift-fn [s]
-  (fn [] (swap! state #(update % :shift (fn [e] (if (= s e) "" s))))))
+  (fn [] (swap! state #(update % :shift (fn [e] (if (= s e) :none s))))))
 
-(defn btn [{:keys [x y height ftext mtext gtext nfn] :or {height 80}}]
+(defn set-precision-fn [n]
+  (fn [] (swap! state assoc :display-precision n :shift :none)))
+
+(defn dispatch-btn [{:keys [nfn ffn gfn]}]
+  (let [shift (:shift @state)]
+    (cond
+      (and (= :f shift) ffn) (ffn)
+      (and (= :g shift) gfn) (gfn)
+      :else (nfn))))
+
+(defn btn [{:keys [x y height ftext mtext gtext nfn] :or {height 80} :as btn-info}]
   (let [x-fn #(- (+ x 20) (* 5 (count %)))]
     [:g.fg-btn
      [:text.ftext {:x (x-fn ftext) :y (+ 30 y) } ftext]
-     [:rect {:on-click nfn :x (- x 20) :y (+ 40 y) :width 90 :height height}]
+     [:rect
+      {:on-click #(dispatch-btn btn-info) :x (- x 20) :y (+ 40 y) :width 90 :height height}]
      [:text.mtext {:x (x-fn mtext) :y (+ 80 y) } mtext]
      [:text.gtext {:x (x-fn gtext) :y (+ height 35 y) } gtext]]))
 
@@ -107,9 +118,9 @@
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE" :nfn (unary-op-fn #(* -1 %))}
-   :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7)}
-   :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8)}
-   :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9)}
+   :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7) :ffn (set-precision-fn 7)}
+   :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8) :ffn (set-precision-fn 8)}
+   :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9) :ffn (set-precision-fn 9)}
    :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (binary-op-fn /)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ"}
@@ -117,9 +128,9 @@
    :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"}
    :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS"}
-   :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4)}
-   :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5)}
-   :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6)}
+   :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4) :ffn (set-precision-fn 4)}
+   :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5) :ffn (set-precision-fn 5)}
+   :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6) :ffn (set-precision-fn 6)}
    :n-mul {:ftext "" :mtext "x" :gtext "x²" :nfn (binary-op-fn *)}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
@@ -127,9 +138,9 @@
    :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y"}
    :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0" :nfn clx-handler}
    :f-entr {:ftext "PREFIX" :mtext "E\nN" :gtext "=" :height 220 :nfn enter-handler}
-   :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1)}
-   :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2)}
-   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3)}
+   :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1) :ffn (set-precision-fn 1)}
+   :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2) :ffn (set-precision-fn 2)}
+   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3) :ffn (set-precision-fn 3)}
    :n-sub {:ftext "" :mtext "-" :gtext "←" :nfn (binary-op-fn -)}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
    :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn :nfn (toggle-shift-fn :f)}
@@ -137,7 +148,7 @@
    :f-sto {:ftext "" :mtext "STO" :gtext "("}
    :f-rcl {:ftext ""  :mtext "RCL" :gtext ")"}
    :f-nop {:draw-fn #(vector :g)}
-   :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0)}
+   :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0) :ffn (set-precision-fn 0)}
    :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
    :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (binary-op-fn +)}
@@ -161,7 +172,7 @@
   [:g.lcdisplay
    [:rect {:x 50 :y 10 :width 1300 :height 100}]
    [:text.ntext {:x 55 :y 80 } (get-display-num state-info)]
-   [:text.stext {:x 1300 :y 40 } (when shift (name shift))]
+   [:text.stext {:x 1300 :y 40 } (when (#{:f :g} shift) (name shift))]
    [:text.stext {:x 1300 :y 40 } (when (:d-m-y flags) "D.MY")]
    ])
 
