@@ -93,9 +93,10 @@
     (cond
       (and (= :f shift) ffn) (ffn)
       (and (= :g shift) gfn) (gfn)
-      :else (nfn))))
+      :else (nfn))
+    (swap! state assoc :shift :none)))
 
-(defn btn [{:keys [x y height ftext mtext gtext nfn] :or {height 80} :as btn-info}]
+(defn btn [{:keys [x y height ftext mtext gtext] :or {height 80} :as btn-info}]
   (let [x-fn #(- (+ x 20) (* 5 (count %)))]
     [:g.fg-btn
      [:text.ftext {:x (x-fn ftext) :y (+ 30 y) } ftext]
@@ -123,7 +124,7 @@
    :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9) :ffn (set-precision-fn 9)}
    :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (binary-op-fn /)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"}
-   :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ"}
+   :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (unary-op-fn #(/ 1 %))}
    :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN"}
    :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"}
@@ -131,7 +132,7 @@
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4) :ffn (set-precision-fn 4)}
    :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5) :ffn (set-precision-fn 5)}
    :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6) :ffn (set-precision-fn 6)}
-   :n-mul {:ftext "" :mtext "x" :gtext "x²" :nfn (binary-op-fn *)}
+   :n-mul {:ftext "" :mtext "x" :gtext "x²" :nfn (binary-op-fn *) :gfn (unary-op-fn #(* % %))}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
