@@ -14,6 +14,11 @@ For quickly serving up local files, go to the project directory and run:
 
 This serves up http://localhost:9090/rpcalc.html
 
+
+# Demo link
+
+Live demo on [github pages.](./rpcalc.html)
+
 # Status
 
 Early stage, work in progress.
