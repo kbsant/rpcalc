@@ -3,6 +3,8 @@
          '[clojure.string :as string]
          '[cljs.pprint :as pprint])
 
+(defn log [& x] (.log js/console (apply str x)))
+(defn spy [x] (log x) x)
 
 (def state
   (r/atom
@@ -20,7 +22,7 @@
   .fg-btn rect {fill: black; stroke: gold;}
   .fg-btn text.ftext {font-size: 18px;stroke:orange;}
   .fg-btn text.mtext {font-size: 22px;stroke:white;}
-  .fg-btn text.gtext {font-size: 20px;stroke:blue;}
+  .fg-btn text.gtext {font-size: 20px;stroke:dodgerblue;}
   .sh-btn {font-family: sans-serif; fill:navy;}
   .sh-btn text {font-size: 32px;fill: black; stroke: navy;}
   .sh-btn rect.f-btn {fill: orange; stroke: white;}
@@ -35,8 +37,21 @@
 (defn peekz [stack]
   (or (peek stack) 0.0))
 
+(defn popz [stack]
+  (cond-> stack (seq stack) (pop)))
+
+(defn conjn [stack n]
+  (cond-> stack (js/isFinite n) (conj n)))
+
 (defn numberz [s]
   (if (string/blank? s) 0.0 (number s)))
+
+(defn backspace [s]
+  (let [n (count s)]
+    (if (> n 0) (subs s 0 (dec n)) "")))
+
+(defn backspace-handler []
+  (swap! state update :raw-input backspace))
 
 (defn clx-handler []
   (swap! state assoc :raw-input "" :operand-stack [0.0]))
@@ -57,27 +72,29 @@
 (defn num-handler-fn [n]
   (fn [] (swap! state update :raw-input #(str % n))))
 
-(defn replace-with-result [state-info result]
+(defn push-input-value [stack raw-input]
+  (cond-> stack
+    (not (string/blank? raw-input)) (conjn (numberz raw-input))))
+
+(defn update-stack-result
+  [{:keys [raw-input] :as state-info} result-fn op]
   (-> state-info
-        (assoc :raw-input "")
-        (update :operand-stack #(-> % (pop) (conj result)))))
+      (spy)
+      (update :operand-stack push-input-value raw-input)
+      (update :operand-stack (partial result-fn op))
+      (assoc :raw-input "")
+      (spy)))
 
-(defn unary-op-helper [op {:keys [operand-stack raw-input] :as state-info}]
-  (let [n (if (string/blank? raw-input)
-            (peekz operand-stack)
-            (numberz raw-input))]
-    (replace-with-result state-info (op n))))
+(defn unary-op [op stack]
+  (let [result (op (peekz stack))]
+    (-> stack (popz) (conjn result))))
 
-(defn unary-op-fn [op]
-  (fn [] (swap! state (partial unary-op-helper op))))
+(defn binary-op [op stack]
+  (let [rhs (peekz stack)]
+    (unary-op #(op % rhs) (popz stack))))
 
-(defn binary-op-helper [op {:keys [operand-stack raw-input] :as state-info}]
-  (let [lhs (peekz operand-stack)
-        rhs (numberz raw-input)]
-    (replace-with-result state-info (op lhs rhs))))
-
-(defn binary-op-fn [op]
-  (fn [] (swap! state (partial binary-op-helper op))))
+(defn op-fn [arity-fn op]
+  (fn [] (swap! state #(update-stack-result % arity-fn op))))
 
 (defn toggle-flag-fn [f]
   (fn [] (swap! state #(update-in % [:flags f] not))))
@@ -118,13 +135,13 @@
    :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"}
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
-   :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE" :nfn (unary-op-fn #(* -1 %))}
+   :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE" :nfn (op-fn unary-op #(* -1 %))}
    :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7) :ffn (set-precision-fn 7)}
    :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8) :ffn (set-precision-fn 8)}
    :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9) :ffn (set-precision-fn 9)}
-   :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (binary-op-fn /)}
+   :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (op-fn binary-op /)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"}
-   :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (unary-op-fn #(/ 1 %))}
+   :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (op-fn unary-op #(/ 1 %))}
    :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN"}
    :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"}
@@ -132,7 +149,7 @@
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4) :ffn (set-precision-fn 4)}
    :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5) :ffn (set-precision-fn 5)}
    :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6) :ffn (set-precision-fn 6)}
-   :n-mul {:ftext "" :mtext "x" :gtext "x²" :nfn (binary-op-fn *) :gfn (unary-op-fn #(* % %))}
+   :n-mul {:ftext "" :mtext "x" :gtext "x²" :nfn (op-fn binary-op *) :gfn (op-fn unary-op #(* % %))}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
@@ -142,7 +159,7 @@
    :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1) :ffn (set-precision-fn 1)}
    :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2) :ffn (set-precision-fn 2)}
    :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3) :ffn (set-precision-fn 3)}
-   :n-sub {:ftext "" :mtext "-" :gtext "←" :nfn (binary-op-fn -)}
+   :n-sub {:ftext "" :mtext "-" :gtext "←" :nfn (op-fn binary-op -) :gfn backspace-handler}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
    :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn :nfn (toggle-shift-fn :f)}
    :f-g   {:draw-fn shift-btn :mtext "g" :rect-class :rect.g-btn :nfn (toggle-shift-fn :g)}
@@ -152,7 +169,7 @@
    :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0) :ffn (set-precision-fn 0)}
    :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
-   :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (binary-op-fn +)}
+   :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (op-fn binary-op +)}
    })
 
 (def btn-keys
