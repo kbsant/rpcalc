@@ -53,7 +53,13 @@
     (if (> n 0) (subs s 0 (dec n)) "")))
 
 (defn percentage [base pct]
-  (* (numberz base) (/ (numberz pct) 100.0)))
+  (* base (/ pct 100.0)))
+
+(defn pct-diff [a b]
+  (-> (- b a) (/ a) (* 100.0)))
+
+(defn pct-total [base part]
+  (* (/ part base) 100.0))
 
 (defn backspace-handler []
   (swap! state update :raw-input backspace))
@@ -97,7 +103,6 @@
 (defn binary-op [op stack]
   (let [rhs (peekz stack)]
     (unary-op #(op % rhs) (popz stack))))
-
 
 (defn acc-op [op stack]
   (let [rhs (peekz stack)
@@ -182,8 +187,8 @@
    :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (op-fn binary-op /)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x" :nfn (op-fn binary-op Math/pow) :gfn (op-fn unary-op Math/sqrt)}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (op-fn unary-op #(/ 1 %)) :gfn (op-fn unary-op Math/exp)}
-   :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN" :gfn (op-fn unary-op Math/log)}
-   :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
+   :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN" :nfn (op-fn binary-op pct-total) :gfn (op-fn unary-op Math/log)}
+   :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC" :nfn (op-fn binary-op pct-diff)}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG" :nfn (op-fn acc-op percentage)}
    :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS" :nfn (op-fn binary-op #(* %1 (Math/pow 10 %2)))}
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4) :ffn (set-precision-fn 4) :gfn (set-flag-fn :date-format :dmy) :sto (partial sto-fn 4) :rcl (partial rcl-fn 4)}
