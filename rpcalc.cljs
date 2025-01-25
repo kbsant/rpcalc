@@ -12,7 +12,7 @@
     :raw-input ""
     :operand-stack [0.0]
     :display-precision 4
-    :flags {}
+    :flags {:date-format :mdy}
     :shift :none}))
 
 (def svg-style
@@ -97,8 +97,8 @@
 (defn op-fn [arity-fn op]
   (fn [] (swap! state #(update-stack-result % arity-fn op))))
 
-(defn toggle-flag-fn [f]
-  (fn [] (swap! state #(update-in % [:flags f] not))))
+(defn set-flag-fn [f v]
+  (fn [] (swap! state #(assoc-in % [:flags f] v))))
 
 (defn toggle-shift-fn [s]
   (fn [] (swap! state #(update % :shift (fn [e] (if (= s e) :none s))))))
@@ -106,13 +106,42 @@
 (defn set-precision-fn [n]
   (fn [] (swap! state assoc :display-precision n :shift :none)))
 
-(defn dispatch-btn [{:keys [nfn ffn gfn]}]
+(defn sto-fn [n]
+  (swap!
+   state
+   (fn
+     [{:keys [raw-input] :as state-info}]
+     (-> state-info
+         (spy)
+         (update :operand-stack push-input-value raw-input)
+         (#(assoc-in % [:sto n] (peekz (:operand-stack %))))
+         (assoc :raw-input "")
+         (spy)))))
+
+(defn rcl-fn [n]
+  (swap!
+   state
+   (fn
+     [{:keys [sto] :as state-info}]
+     (-> state-info
+         (spy)
+         (update :operand-stack #(conjn % (get sto n)))
+         (assoc :raw-input "")
+         (spy)))))
+
+(defn dispatch-btn [{:keys [nfn ffn gfn sto rcl shiftfn mtext]}]
   (let [shift (:shift @state)]
     (cond
       (and (= :f shift) ffn) (ffn)
       (and (= :g shift) gfn) (gfn)
-      :else (nfn))
-    (swap! state assoc :shift :none)))
+      (and (= :sto shift) sto) (sto)
+      (and (= :rcl shift) rcl) (rcl)
+      nfn (nfn)
+      (not shiftfn) (log "Unmapped button:" mtext)
+      :else :none)
+    (if shiftfn
+      (shiftfn)
+      (swap! state assoc :shift :none))))
 
 (defn btn [{:keys [x y height ftext mtext gtext] :or {height 80} :as btn-info}]
   (let [x-fn #(- (+ x 20) (* 5 (count %)))]
@@ -123,10 +152,10 @@
      [:text.mtext {:x (x-fn mtext) :y (+ 80 y) } mtext]
      [:text.gtext {:x (x-fn gtext) :y (+ height 35 y) } gtext]]))
 
-(defn shift-btn [{:keys [x y mtext nfn rect-class]}]
+(defn shift-btn [{:keys [x y mtext shiftfn rect-class]}]
   (let [x-fn #(- (+ x 20) (* 5 (count %)))]
     [:g.sh-btn
-     [rect-class {:on-click nfn :x (- x 20) :y (+ 40 y) :width 90 :height 80}]
+     [rect-class {:on-click shiftfn :x (- x 20) :y (+ 40 y) :width 90 :height 80}]
      [:text {:x (x-fn mtext) :y (+ 90 y) } mtext]]))
 
 (def btn-info
@@ -136,19 +165,19 @@
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE" :nfn (op-fn unary-op #(* -1 %))}
-   :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7) :ffn (set-precision-fn 7)}
-   :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8) :ffn (set-precision-fn 8)}
-   :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9) :ffn (set-precision-fn 9)}
+   :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7) :ffn (set-precision-fn 7) :sto (partial sto-fn 7) :rcl (partial rcl-fn 7)}
+   :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8) :ffn (set-precision-fn 8) :sto (partial sto-fn 8) :rcl (partial rcl-fn 8)}
+   :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9) :ffn (set-precision-fn 9) :sto (partial sto-fn 9) :rcl (partial rcl-fn 9)}
    :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (op-fn binary-op /)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x" :nfn (op-fn binary-op Math/pow) :gfn (op-fn unary-op Math/sqrt)}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (op-fn unary-op #(/ 1 %)) :gfn (op-fn unary-op Math/exp)}
    :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN" :gfn (op-fn unary-op Math/log)}
    :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"}
-   :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS"}
-   :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4) :ffn (set-precision-fn 4)}
-   :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5) :ffn (set-precision-fn 5)}
-   :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6) :ffn (set-precision-fn 6)}
+   :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS" :nfn (op-fn binary-op #(* %1 (Math/pow 10 %2)))}
+   :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4) :ffn (set-precision-fn 4) :gfn (set-flag-fn :date-format :dmy) :sto (partial sto-fn 4) :rcl (partial rcl-fn 4)}
+   :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5) :ffn (set-precision-fn 5) :gfn (set-flag-fn :date-format :mdy) :sto (partial sto-fn 5) :rcl (partial rcl-fn 5)}
+   :n-6   {:ftext "" :mtext "6" :gtext "x̄w" :nfn (num-handler-fn 6) :ffn (set-precision-fn 6) :sto (partial sto-fn 6) :rcl (partial rcl-fn 6)}
    :n-mul {:ftext "" :mtext "x" :gtext "x²" :nfn (op-fn binary-op *) :gfn (op-fn unary-op #(* % %))}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
@@ -156,17 +185,17 @@
    :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y"}
    :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0" :nfn clx-handler}
    :f-entr {:ftext "PREFIX" :mtext "E\nN" :gtext "=" :height 220 :nfn enter-handler}
-   :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1) :ffn (set-precision-fn 1)}
-   :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2) :ffn (set-precision-fn 2)}
-   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3) :ffn (set-precision-fn 3)}
+   :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1) :ffn (set-precision-fn 1) :sto (partial sto-fn 1) :rcl (partial rcl-fn 1)}
+   :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2) :ffn (set-precision-fn 2) :sto (partial sto-fn 2) :rcl (partial rcl-fn 2)}
+   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3) :ffn (set-precision-fn 3) :sto (partial sto-fn 3) :rcl (partial rcl-fn 3)}
    :n-sub {:ftext "" :mtext "-" :gtext "←" :nfn (op-fn binary-op -) :gfn backspace-handler}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
-   :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn :nfn (toggle-shift-fn :f)}
-   :f-g   {:draw-fn shift-btn :mtext "g" :rect-class :rect.g-btn :nfn (toggle-shift-fn :g)}
-   :f-sto {:ftext "" :mtext "STO" :gtext "("}
-   :f-rcl {:ftext ""  :mtext "RCL" :gtext ")"}
+   :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn :shiftfn (toggle-shift-fn :f)}
+   :f-g   {:draw-fn shift-btn :mtext "g" :rect-class :rect.g-btn :shiftfn (toggle-shift-fn :g)}
+   :f-sto {:ftext "" :mtext "STO" :gtext "(" :shiftfn (toggle-shift-fn :sto)}
+   :f-rcl {:ftext "" :mtext "RCL" :gtext ")" :shiftfn (toggle-shift-fn :rcl)}
    :f-nop {:draw-fn #(vector :g)}
-   :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0) :ffn (set-precision-fn 0)}
+   :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0) :ffn (set-precision-fn 0) :sto (partial sto-fn 0) :rcl (partial rcl-fn 0)}
    :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
    :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (op-fn binary-op +)}})
@@ -189,7 +218,7 @@
   [:g.lcdisplay
    [:rect {:x 50 :y 10 :width 1300 :height 100}]
    [:text.ntext {:x 55 :y 80 } (get-display-num state-info)]
-   [:text.stext {:x 1300 :y 40 } (when (#{:f :g} shift) (name shift))]
+   [:text.stext {:x 1290 :y 40 } (when (#{:f :g :sto :rcl} shift) (name shift))]
    [:text.stext {:x 1300 :y 40 } (when (:d-m-y flags) "D.MY")]
    ])
 
@@ -217,7 +246,7 @@
 (defn my-component []
   (let [state-info @state]
     [:div {:style {:color "silver" :background-color "black" :font "9pt sans-serif"}}
-     [:p "This site is an exercise - for educational purposes only."]
+     [:p "This site is an exercise - for educational purposes only." ]
      [:div (frame state-info)]]))
 
 (rdom/render [my-component] (.getElementById js/document "app"))
