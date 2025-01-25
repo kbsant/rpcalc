@@ -8,7 +8,8 @@
 
 (def state
   (r/atom
-   {:raw-input ""
+   {:sto [0 0 0 0 0 0 0 0 0 0]
+    :raw-input ""
     :operand-stack [0.0]
     :display-precision 4
     :flags {}
@@ -129,8 +130,7 @@
      [:text {:x (x-fn mtext) :y (+ 90 y) } mtext]]))
 
 (def btn-info
-  {
-   :f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"}
+  {:f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"}
    :f-i   {:ftext "INT" :mtext "i" :gtext "12÷"}
    :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"}
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
@@ -140,9 +140,9 @@
    :n-8   {:ftext "" :mtext "8" :gtext "END" :nfn (num-handler-fn 8) :ffn (set-precision-fn 8)}
    :n-9   {:ftext "" :mtext "9" :gtext "MEM" :nfn (num-handler-fn 9) :ffn (set-precision-fn 9)}
    :n-div {:ftext "" :mtext "÷" :gtext "⤶" :nfn (op-fn binary-op /)}
-   :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"}
-   :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (op-fn unary-op #(/ 1 %))}
-   :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN"}
+   :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x" :nfn (op-fn binary-op Math/pow) :gfn (op-fn unary-op Math/sqrt)}
+   :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (op-fn unary-op #(/ 1 %)) :gfn (op-fn unary-op Math/exp)}
+   :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN" :gfn (op-fn unary-op Math/log)}
    :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"}
    :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS"}
@@ -169,8 +169,7 @@
    :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0) :ffn (set-precision-fn 0)}
    :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
-   :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (op-fn binary-op +)}
-   })
+   :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (op-fn binary-op +)}})
 
 (def btn-keys
   {:row-0 [:f-n :f-i :f-pv :f-pmt :f-fv :f-chs :n-7 :n-8 :n-9 :n-div]
