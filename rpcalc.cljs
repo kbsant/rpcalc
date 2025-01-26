@@ -8,12 +8,12 @@
 
 (def initial-state
   {:sto [0 0 0 0 0 0 0 0 0 0]
-    :raw-input ""
-    :lastx 0.0
-    :operand-stack [0.0]
-    :display-precision 4
-    :flags {:date-format :mdy}
-    :shift :none})
+   :raw-input ""
+   :lastx 0.0
+   :operand-stack [0.0]
+   :display-precision 4
+   :flags {:date-format :mdy :sci false}
+   :shift :none})
 
 (def state (r/atom initial-state))
 
@@ -32,6 +32,7 @@
   .sh-btn rect.g-btn {fill: dodgerblue; stroke: white;}
   text.ntext {font: 90px monospace; fill:dimgray; stroke:black;}
   text.stext {font: 30px monospace; fill:black; stroke:black;}
+  text.sstext {font: 18px monospace; fill:black; stroke:black;}
   """ ])
 
 (defn number [n]
@@ -66,7 +67,12 @@
   (swap! state update :raw-input backspace))
 
 (defn clx-handler []
-  (swap! state assoc :raw-input "" :operand-stack [0.0]))
+  (swap! state assoc :raw-input ""))
+
+(defn clx-reg-handler []
+  (swap! state merge
+         (select-keys initial-state
+                      [:raw-input :operand-stack :sto :lastx])))
 
 (defn update-lastx [{stack :operand-stack :as state-info}]
   (assoc state-info :lastx (peekz stack)))
@@ -100,35 +106,51 @@
       (spy)
       (update :operand-stack push-input-value raw-input)
       (update-lastx)
-      (update :operand-stack (partial result-fn op))
+      (update :operand-stack (partial result-fn state-info op))
       (assoc :raw-input "")
       (spy)))
 
-(defn unary-op [op stack]
+(defn op-fn [upd-fn op]
+  (fn [] (swap! state #(update-stack-result % upd-fn op))))
+
+(defn unary-op [_ op stack]
   (let [result (op (peekz stack))]
     (-> stack (popz) (conjn result))))
 
-(defn binary-op [op stack]
+(defn binary-op [_ op stack]
   (let [rhs (peekz stack)]
-    (unary-op #(op % rhs) (popz stack))))
+    (unary-op _ #(op % rhs) (popz stack))))
 
-(defn acc-op [op stack]
+(defn acc-op [_ op stack]
   (let [rhs (peekz stack)
         lhs (peekz (popz stack))
         result (op lhs rhs)]
     (-> stack (popz) (conjn result))))
 
-(defn op-fn [upd-fn op]
-  (fn [] (swap! state #(update-stack-result % upd-fn op))))
+(defn swap-nop [_ _ stack]
+  (let [rhs (peekz stack)
+        lhs (peekz (popz stack))]
+    (-> stack (popz) (popz) (conjn rhs) (conjn lhs))))
+
+(defn round-nop [{digits :display-precision} _ stack]
+  (let [result (-> (peekz stack) (numberz) (.toFixed digits))]
+    (-> stack (popz) (conjn result))))
 
 (defn set-flag-fn [f v]
   (fn [] (swap! state #(assoc-in % [:flags f] v))))
+
+(defn toggle-flag-fn [f]
+  (fn [] (swap! state #(update-in % [:flags f] not))))
 
 (defn toggle-shift-fn [s]
   (fn [] (swap! state #(update % :shift (fn [e] (if (= s e) :none s))))))
 
 (defn set-precision-fn [n]
-  (fn [] (swap! state assoc :display-precision n :shift :none)))
+  (fn [] (swap!
+          state
+          #(-> %
+               (assoc :display-precision n :shift :none)
+               (assoc-in [:flags :sci] false)))))
 
 (defn sto-fn [n]
   #(swap!
@@ -197,7 +219,7 @@
   {:f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"}
    :f-i   {:ftext "INT" :mtext "i" :gtext "12÷"}
    :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"}
-   :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"}
+   :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj" :ffn (op-fn round-nop 1)}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE" :nfn (op-fn unary-op #(* -1 %))}
    :n-7   {:ftext "" :mtext "7" :gtext "BEG" :nfn (num-handler-fn 7) :ffn (set-precision-fn 7) :sto (sto-fn 7) :rcl (rcl-fn 7)}
@@ -217,8 +239,8 @@
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
-   :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y"}
-   :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0" :nfn clx-handler}
+   :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y" :nfn (op-fn swap-nop 1)}
+   :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0" :nfn clx-handler :ffn clx-reg-handler}
    :f-entr {:ftext "PREFIX" :mtext "EN" :gtext "=" :height 220 :nfn enter-handler}
    :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1) :ffn (set-precision-fn 1) :sto (sto-fn 1) :rcl (rcl-fn 1)}
    :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2) :ffn (set-precision-fn 2) :sto (sto-fn 2) :rcl (rcl-fn 2)}
@@ -231,7 +253,7 @@
    :f-rcl {:ftext "" :mtext "RCL" :gtext ")" :shiftfn (toggle-shift-fn :rcl)}
    :f-nop {:draw-fn #(vector :g)}
    :n-0   {:ftext "" :mtext "0" :gtext "x̄" :nfn (num-handler-fn 0) :ffn (set-precision-fn 0) :sto (sto-fn 0) :rcl (rcl-fn 0)}
-   :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler}
+   :n-d   {:ftext "" :mtext "." :gtext "S" :nfn decimal-pt-handler :ffn (toggle-flag-fn :sci)}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
    :n-add {:ftext "" :mtext "+" :gtext "LSTx" :nfn (op-fn binary-op +) :gfn lastx-handler}})
 
@@ -241,21 +263,25 @@
    :row-2 [:f-rs :f-sst :f-run :f-x-y :f-clx :f-entr :n-1 :n-2 :n-3 :n-sub]
    :row-3 [:f-on :f-f :f-g :f-sto :f-rcl :f-nop :n-0 :n-d :n-S :n-add]})
 
-(defn format-prec-float [precision n]
-  (pprint/cl-format nil (str "~," precision "f") n))
+(defn format-prec-float [flags precision n]
+  (if (:sci flags)
+    (.toExponential (numberz n))
+    (pprint/cl-format nil (str "~," precision "f") n)))
 
-(defn get-display-num[{:keys [operand-stack display-precision raw-input]}] 
+(defn get-display-num
+  [{:keys [operand-stack flags display-precision raw-input]}]
   (if (string/blank? raw-input)
-    (format-prec-float display-precision (peekz operand-stack))
+    (format-prec-float flags display-precision (peekz operand-stack))
     raw-input))
 
 (defn lcdisplay [{:keys [flags shift] :as state-info}]
   [:g.lcdisplay
    [:rect {:x 50 :y 10 :width 1300 :height 100}]
-   [:text.ntext {:x 55 :y 80 } (get-display-num state-info)]
-   [:text.stext {:x 1290 :y 40 } (when (#{:f :g :sto :rcl} shift) (name shift))]
-   [:text.stext {:x 1300 :y 40 } (when (:d-m-y flags) "D.MY")]
-   ])
+   [:text.ntext {:x 55 :y 80} (get-display-num state-info)]
+   [:text.stext {:x 1290 :y 40} (when (#{:f :g} shift) (name shift))]
+   [:text.sstext {:x 1270 :y 40} (when (#{:sto :rcl} shift) (name shift))]
+   [:text.sstext {:x 1270 :y 85} (when (= :dmy (:date-format flags)) "D.MY")]
+   [:text.sstext {:x 1270 :y 105}  "RPN"]])
 
 (defn render-buttons []
   (into
