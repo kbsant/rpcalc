@@ -229,8 +229,8 @@
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x" :nfn (op-fn binary-op Math/pow) :gfn (op-fn unary-op Math/sqrt)}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ" :nfn (op-fn unary-op #(/ 1 %)) :gfn (op-fn unary-op Math/exp)}
    :f-pctt {:ftext "SL" :mtext "%T" :gtext "LN" :nfn (op-fn binary-op pct-total) :gfn (op-fn unary-op Math/log)}
-   :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC" :nfn (op-fn binary-op pct-diff)}
-   :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG" :nfn (op-fn acc-op percentage)}
+   :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC" :nfn (op-fn binary-op pct-diff) :gfn (op-fn unary-op #(- %  (Math/trunc %)))}
+   :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG" :nfn (op-fn acc-op percentage) :gfn (op-fn unary-op Math/trunc)}
    :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS" :nfn (op-fn binary-op #(* %1 (Math/pow 10 %2)))}
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY" :nfn (num-handler-fn 4) :ffn (set-precision-fn 4) :gfn (set-flag-fn :date-format :dmy) :sto (sto-fn 4) :rcl (rcl-fn 4)}
    :n-5   {:ftext "" :mtext "5" :gtext "M.DY" :nfn (num-handler-fn 5) :ffn (set-precision-fn 5) :gfn (set-flag-fn :date-format :mdy) :sto (sto-fn 5) :rcl (rcl-fn 5)}
@@ -244,7 +244,7 @@
    :f-entr {:ftext "PREFIX" :mtext "EN" :gtext "=" :height 220 :nfn enter-handler}
    :n-1   {:ftext "" :mtext "1" :gtext "x̂,r" :nfn (num-handler-fn 1) :ffn (set-precision-fn 1) :sto (sto-fn 1) :rcl (rcl-fn 1)}
    :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r" :nfn (num-handler-fn 2) :ffn (set-precision-fn 2) :sto (sto-fn 2) :rcl (rcl-fn 2)}
-   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3) :ffn (set-precision-fn 3) :sto (sto-fn 3) :rcl (rcl-fn 3)}
+   :n-3   {:ftext "" :mtext "3" :gtext "n!" :nfn (num-handler-fn 3) :ffn (set-precision-fn 3) :gfn (op-fn unary-op #(reduce * (range 1 (inc %)))) :sto (sto-fn 3) :rcl (rcl-fn 3)}
    :n-sub {:ftext "" :mtext "-" :gtext "←" :nfn (op-fn binary-op -) :gfn backspace-handler}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
    :f-f   {:draw-fn shift-btn :mtext "f" :rect-class :rect.f-btn :shiftfn (toggle-shift-fn :f)}
