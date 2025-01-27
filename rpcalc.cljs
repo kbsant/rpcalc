@@ -67,7 +67,7 @@
   (swap! state update :raw-input backspace))
 
 (defn clx-handler []
-  (swap! state assoc :raw-input ""))
+  (swap! state assoc :raw-input "" :lastx nil))
 
 (defn clx-reg-handler []
   (swap! state merge
@@ -269,9 +269,10 @@
     (pprint/cl-format nil (str "~," precision "f") n)))
 
 (defn get-display-num
-  [{:keys [operand-stack flags display-precision raw-input]}]
+  [{:keys [operand-stack flags display-precision raw-input lastx]}]
   (if (string/blank? raw-input)
-    (format-prec-float flags display-precision (peekz operand-stack))
+    (format-prec-float flags display-precision
+                       (if lastx (peekz operand-stack) 0.0))
     raw-input))
 
 (defn lcdisplay [{:keys [flags shift] :as state-info}]
