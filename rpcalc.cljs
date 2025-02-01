@@ -61,6 +61,8 @@
 (defn frac-part [d]
   (- d  (Math/trunc d)))
 
+(def intg-part Math/trunc)
+
 (defn percentage [base pct]
   (* base (/ pct 100.0)))
 
@@ -69,6 +71,23 @@
 
 (defn pct-total [base part]
   (* (/ part base) 100.0))
+
+
+(defn ymd-date [y m d]
+  (js/Date. y (dec m) d))
+
+(defn parse-date [to-date-fn nd]
+  (let [dd (intg-part nd)
+        mmyyyy (* 100 (- nd dd))
+        mm (intg-part mmyyyy)
+        yyyy (* 10000 (- mmyyyy mm))]
+    (to-date-fn yyyy mm dd)))
+
+(defn dmy-date [nd]
+  (parse-date ymd-date nd))
+
+(defn mdy-date [nd]
+  (parse-date #(ymd-date %1 %3 %2) nd))
 
 (defn backspace-handler []
   (swap! state
@@ -261,7 +280,7 @@
    :f-pctd {:ftext "SOYD" :mtext "Δ%" :gtext "FRAC"
             :nfn (op-fn binary-op pct-diff) :gfn (op-fn unary-op frac-part)}
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"
-           :nfn (op-fn acc-op percentage) :gfn (op-fn unary-op Math/trunc)}
+           :nfn (op-fn acc-op percentage) :gfn (op-fn unary-op intg-part)}
    :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS"
            :nfn (op-fn binary-op #(* %1 (Math/pow 10 %2)))}
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY"
