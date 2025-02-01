@@ -71,7 +71,10 @@
   (* (/ part base) 100.0))
 
 (defn backspace-handler []
-  (swap! state update :raw-input backspace))
+  (swap! state
+         #(as-> % s
+            (update s :raw-input backspace)
+            (if (= "" (:raw-input s)) (assoc s :lastx nil) s))))
 
 (defn clx-handler []
   (swap! state assoc :raw-input "" :lastx nil))
