@@ -72,8 +72,15 @@
 (defn pct-total [base part]
   (* (/ part base) 100.0))
 
+(def day-ms (* 24 60 60 1000))
 
-(defn ymd-date [y m d]
+(defn ymd-str [y m d]
+  (pprint/cl-format "~4,0D-~2,0D-~2,0D" y m d))
+
+(defn ymd-date-ts [y m d]
+  (.parse js/Date (ymd-str y m d)))
+
+(defn ymd-date-obj [y m d]
   (js/Date. y (dec m) d))
 
 (defn parse-date [to-date-fn nd]
@@ -84,10 +91,13 @@
     (to-date-fn yyyy mm dd)))
 
 (defn dmy-date [nd]
-  (parse-date ymd-date nd))
+  (parse-date ymd-date-ts nd))
 
 (defn mdy-date [nd]
-  (parse-date #(ymd-date %1 %3 %2) nd))
+  (parse-date #(ymd-date-ts %1 %3 %2) nd))
+
+(defn add-days [dmy? ndate days]
+  (let [date-ts ((if dmy? dmy-date mdy-date) ndate)]))
 
 (defn backspace-handler []
   (swap! state
