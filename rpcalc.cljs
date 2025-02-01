@@ -166,24 +166,27 @@
   #(swap!
     state
     (fn
-      [{:keys [raw-input] :as state-info}]
-      (-> state-info
-          (spy)
-          (update :operand-stack push-input-value raw-input)
-          ((fn [s] (assoc-in s [:sto n] (peekz (:operand-stack s)))))
-          (assoc :raw-input "")
-          (spy)))))
+      [{:keys [raw-input sto-op] :as state-info}]
+      (as-> state-info s
+        (spy s)
+        (update s :operand-stack push-input-value raw-input)
+        (if sto-op
+          (update-in s [:sto n] sto-op (peekz (:operand-stack s)))
+          (assoc-in s [:sto n] (peekz (:operand-stack s))))
+        (assoc s :raw-input "" :sto-op nil)
+        (spy s)))))
 
 (defn rcl-fn [n]
   #(swap!
     state
     (fn
       [{:keys [sto] :as state-info}]
-      (-> state-info
-          (spy)
-          (update :operand-stack conjn (get sto n))
-          (assoc :raw-input "")
-          (spy)))))
+      (let [d (get sto n)]
+        (-> state-info
+            (spy)
+            (update :operand-stack conjn d)
+            (assoc :raw-input "" :lastx d)
+            (spy))))))
 
 (defn lastx-handler []
   (swap!
@@ -246,7 +249,9 @@
            :nfn (num-handler-fn 9) :ffn (set-precision-fn 9)
            :sto (sto-fn 9) :rcl (rcl-fn 9)}
    :n-div {:ftext "" :mtext "÷" :gtext "⤶"
-           :nfn (op-fn binary-op /)}
+           :nfn (op-fn binary-op /)
+           :sto #(swap! state assoc :sto-op /)
+           :shiftfn (constantly nil)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"
            :nfn (op-fn binary-op Math/pow) :gfn (op-fn unary-op Math/sqrt)}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ"
@@ -271,7 +276,9 @@
            :nfn (num-handler-fn 6) :ffn (set-precision-fn 6)
            :sto (sto-fn 6) :rcl (rcl-fn 6)}
    :n-mul {:ftext "" :mtext "x" :gtext "x²"
-           :nfn (op-fn binary-op *) :gfn (op-fn unary-op #(* % %))}
+           :nfn (op-fn binary-op *) :gfn (op-fn unary-op #(* % %))
+           :sto #(swap! state assoc :sto-op *)
+           :shiftfn (constantly nil)}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
@@ -292,7 +299,9 @@
            :gfn (op-fn unary-op factorial)
            :sto (sto-fn 3) :rcl (rcl-fn 3)}
    :n-sub {:ftext "" :mtext "-" :gtext "←"
-           :nfn (op-fn binary-op -) :gfn backspace-handler}
+           :nfn (op-fn binary-op -) :gfn backspace-handler
+           :sto #(swap! state assoc :sto-op -)
+           :shiftfn (constantly nil)}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
    :f-f   {:draw-fn shift-btn :mtext "f"
            :rect-class :rect.f-btn :shiftfn (toggle-shift-fn :f)}
@@ -310,7 +319,9 @@
            :nfn decimal-pt-handler :ffn (toggle-flag-fn :sci)}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
    :n-add {:ftext "" :mtext "+" :gtext "LSTx"
-           :nfn (op-fn binary-op +) :gfn lastx-handler}})
+           :nfn (op-fn binary-op +) :gfn lastx-handler
+           :sto #(swap! state assoc :sto-op +)
+           :shiftfn (constantly nil)}})
 
 (def btn-keys
   {:row-0 [:f-n :f-i :f-pv :f-pmt :f-fv :f-chs :n-7 :n-8 :n-9 :n-div]
