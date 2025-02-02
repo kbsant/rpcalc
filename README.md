@@ -4,7 +4,7 @@ A web-based rpn calculator.
 
 # Screenshot
 
-	![Calculator screenshot](./screenshot.svg)
+![Calculator screenshot](./screenshot.svg)
 
 # Demo link
 
