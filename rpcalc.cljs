@@ -3,7 +3,7 @@
          '[clojure.string :as string]
          '[cljs.pprint :as pprint])
 
-(defn log [& x] nil #_ (.log js/console (apply str x)))
+(defn log [& x] nil  (.log js/console (apply str x)))
 (defn spy [x] (log x) x)
 
 (def initial-state
@@ -14,6 +14,7 @@
    :display-precision 4
    :flags {:date-format :mdy :sci false}
    :shift :none
+   :day nil
    :undo {}})
 
 (def state (r/atom initial-state))
@@ -32,9 +33,13 @@
   .sh-btn rect.f-btn {fill: orange; stroke: white;}
   .sh-btn rect.g-btn {fill: dodgerblue; stroke: white;}
   text.ntext {font: 90px monospace; fill:dimgray; stroke:black;}
+  text.mtext {font: 60px monospace; fill:dimgray; stroke:black;}
   text.stext {font: 30px monospace; fill:black; stroke:black;}
   text.sstext {font: 18px monospace; fill:black; stroke:black;}
   """ ])
+
+(defn state-fn [& args]
+  #(apply swap! state args))
 
 (defn number [n]
   (js/Number. n))
@@ -72,32 +77,63 @@
 (defn pct-total [base part]
   (* (/ part base) 100.0))
 
-(def day-ms (* 24 60 60 1000))
+(defn days-ms [n]
+  (* 24 60 60 1000 n))
+
+(defn day-name [n]
+  (get ["SUN" "MON" "TUE" "WED" "THU" "FRI" "SAT"] n))
+
+(defn day-num7 [n]
+  (get [1 2 3 4 5 6 7] n))
 
 (defn ymd-str [y m d]
   (pprint/cl-format "~4,0D-~2,0D-~2,0D" y m d))
 
 (defn ymd-date-ts [y m d]
-  (.parse js/Date (ymd-str y m d)))
+  (.UTC js/Date (ymd-str y m d)))
 
-(defn ymd-date-obj [y m d]
-  (js/Date. y (dec m) d))
+(defn ts-date [ts]
+  (let [date (js/Date. ts)
+        y (.getUTCFullYear date)
+        m-1 (.getUTCMonth date)
+        d (.getUTCDate date)
+        dow (.getUTCDay date)]
+    [y (inc m-1) d dow]))
 
-(defn parse-date [to-date-fn nd]
-  (let [dd (intg-part nd)
-        mmyyyy (* 100 (- nd dd))
+(defn ts-date-dmy [ts]
+  (let [[y m d dow] (ts-date ts)]
+    [(+ d (/ m 100) (/ y 10000)) (day-num7 dow)]))
+
+(defn ts-date-mdy [ts]
+  (let [[y m d dow] (ts-date ts)]
+    [(+ m (/ d 100) (/ y 10000)) (day-num7 dow)]))
+
+(defn parse-date [to-date-fn ndate]
+  (let [dd (intg-part ndate)
+        mmyyyy (* 100 (- ndate dd))
         mm (intg-part mmyyyy)
         yyyy (* 10000 (- mmyyyy mm))]
     (to-date-fn yyyy mm dd)))
 
-(defn dmy-date [nd]
-  (parse-date ymd-date-ts nd))
+(defn dmy-date [ndate]
+  (parse-date ymd-date-ts ndate))
 
-(defn mdy-date [nd]
-  (parse-date #(ymd-date-ts %1 %3 %2) nd))
+(defn mdy-date [ndate]
+  (parse-date #(ymd-date-ts %1 %3 %2) ndate))
 
 (defn add-days [dmy? ndate days]
-  (let [date-ts ((if dmy? dmy-date mdy-date) ndate)]))
+  (let [date0-ts ((if dmy? dmy-date mdy-date) ndate)
+        date1-ts (+ date0-ts (days-ms days))]
+    ((if dmy? ts-date-dmy ts-date-mdy) date1-ts)))
+
+(defn add-days-helper [{:keys [flags operand-stack] :as state-info}]
+  (let [dmy? (= :dmy (:date-format flags))
+        days (peekz operand-stack)
+        ndate-0 (peekz (pop operand-stack))
+        [ndate-1 dow] (add-days dmy? ndate-0 days)]
+    (-> state-info
+        (update :operand-stack #(-> % (popz) (popz) (conjn ndate-1)))
+        (assoc :day dow))))
 
 (defn backspace-handler []
   (swap! state
@@ -106,19 +142,19 @@
             (if (= "" (:raw-input s)) (assoc s :lastx nil) s))))
 
 (defn clx-handler []
-  (swap! state assoc :raw-input "" :lastx nil))
+  (swap! state assoc :raw-input "" :lastx nil :day nil))
 
 (defn clx-reg-handler []
   (swap! state merge
          (select-keys initial-state
-                      [:raw-input :operand-stack :sto :lastx])))
+                      [:raw-input :operand-stack :sto :lastx :day])))
 
 (defn update-lastx [{stack :operand-stack :as state-info}]
   (assoc state-info :lastx (peekz stack)))
 
 (defn enter-helper [{r :raw-input :as state-info}]
   (-> state-info
-      (assoc :raw-input "")
+      (assoc :raw-input "" :day nil)
       (update :operand-stack conj (numberz r))
       (update-lastx)))
 
@@ -132,8 +168,14 @@
                       :else (str % "."))]
     (swap! state update :raw-input dp-if-none)))
 
+(def max-digits-in 20)
+
 (defn num-handler-fn [n]
-  (fn [] (swap! state update :raw-input #(str % n))))
+  #(swap! state update :raw-input
+          (fn [r]
+            (if (< (count r) max-digits-in)
+              (str r n)
+              r))))
 
 (defn push-input-value [stack raw-input]
   (cond-> stack
@@ -228,7 +270,7 @@
          (assoc :raw-input "")
          (spy)))))
 
-(defn dispatch-btn [{:keys [nfn ffn gfn sto rcl shiftfn mtext]}]
+(defn dispatch-btn [{:keys [nfn ffn gfn sto rcl shiftfn stofn mtext]}]
   (let [shift (:shift @state)]
     (cond
       (and (= :f shift) ffn) (ffn)
@@ -238,8 +280,8 @@
       nfn (nfn)
       (not shiftfn) (log "Unmapped button:" mtext)
       :else :none)
-    (if shiftfn
-      (shiftfn)
+    (if (or shiftfn (and (= :sto shift) stofn))
+      ((or shiftfn stofn))
       (swap! state assoc :shift :none))))
 
 (defn btn
@@ -267,7 +309,8 @@
            :ffn (op-fn round-nop 1)}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"
-           :nfn (op-fn unary-op #(* -1 %))}
+           :nfn (op-fn unary-op #(* -1 %))
+           :gfn (state-fn add-days-helper)}
    :n-7   {:ftext "" :mtext "7" :gtext "BEG"
            :nfn (num-handler-fn 7) :ffn (set-precision-fn 7)
            :sto (sto-fn 7) :rcl (rcl-fn 7)}
@@ -280,7 +323,7 @@
    :n-div {:ftext "" :mtext "÷" :gtext "⤶"
            :nfn (op-fn binary-op /)
            :sto #(swap! state assoc :sto-op /)
-           :shiftfn (constantly nil)}
+           :stofn (constantly nil)}
    :f-exp {:ftext "PRICE" :mtext "yˣ" :gtext "√x"
            :nfn (op-fn binary-op Math/pow) :gfn (op-fn unary-op Math/sqrt)}
    :f-inv {:ftext "YTM" :mtext "1/x" :gtext "eˣ"
@@ -307,7 +350,7 @@
    :n-mul {:ftext "" :mtext "x" :gtext "x²"
            :nfn (op-fn binary-op *) :gfn (op-fn unary-op #(* % %))
            :sto #(swap! state assoc :sto-op *)
-           :shiftfn (constantly nil)}
+           :stofn (constantly nil)}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
    :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
@@ -330,7 +373,7 @@
    :n-sub {:ftext "" :mtext "-" :gtext "←"
            :nfn (op-fn binary-op -) :gfn backspace-handler
            :sto #(swap! state assoc :sto-op -)
-           :shiftfn (constantly nil)}
+           :stofn (constantly nil)}
    :f-on  {:ftext "OFF" :mtext "ON" :gtext ""}
    :f-f   {:draw-fn shift-btn :mtext "f"
            :rect-class :rect.f-btn :shiftfn (toggle-shift-fn :f)}
@@ -350,7 +393,7 @@
    :n-add {:ftext "" :mtext "+" :gtext "LSTx"
            :nfn (op-fn binary-op +) :gfn lastx-handler
            :sto #(swap! state assoc :sto-op +)
-           :shiftfn (constantly nil)}})
+           :stofn (constantly nil)}})
 
 (def btn-keys
   {:row-0 [:f-n :f-i :f-pv :f-pmt :f-fv :f-chs :n-7 :n-8 :n-9 :n-div]
@@ -370,11 +413,18 @@
                        (if lastx (peekz operand-stack) 0.0))
     raw-input))
 
+(defn get-day [{:keys [raw-input day]}]
+  (when (and day (= "" raw-input)) day))
+
 (defn lcdisplay [{:keys [flags shift] :as state-info}]
   [:g.lcdisplay
    [:rect {:x 50 :y 10 :width 1300 :height 100}]
    [:text.ntext {:x 55 :y 80} (get-display-num state-info)]
    [:text.stext {:x 1290 :y 40} (when (#{:f :g} shift) (name shift))]
+   (when-let [day (get-day state-info)]
+     [:g
+      [:text.mtext {:x 1270 :y 40} day]
+      [:text.sstext {:x 1270 :y 70} (day-name day)]])
    [:text.sstext {:x 1270 :y 40} (when (#{:sto :rcl} shift) (name shift))]
    [:text.sstext {:x 1270 :y 85} (when (= :dmy (:date-format flags)) "D.MY")]
    [:text.sstext {:x 1270 :y 105}  "RPN"]])
