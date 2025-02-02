@@ -86,7 +86,7 @@
   (* ms-per-day ds))
 
 (defn ms-days [ms]
-  (int (/ ms ms-per-day)))
+  (-> (/ ms ms-per-day) (round-prec 0) (int)))
 
 (defn day-name [n]
   (get ["SUN" "MON" "TUE" "WED" "THU" "FRI" "SAT"] n))
@@ -248,10 +248,12 @@
   (let [dmy? (= :dmy (:date-format flags))
         ndate-1 (peekz operand-stack)
         ndate-0 (peekz (pop operand-stack))
-        delta (sub-dates dmy? ndate-0 ndate-1)]
+        delta (sub-dates dmy? ndate-0 ndate-1)
+        delta30 (dec delta)]
     (log "ndate-0:" ndate-0 " ndate-1:" ndate-1 " delta:" delta)
     (-> state-info
-        (update :operand-stack #(-> % (popz) (popz) (conjn delta)))
+        (update :operand-stack
+                #(-> % (popz) (popz) (conjn delta30) (conjn delta)))
         (spy))))
 
 (defn add-days-fn []
