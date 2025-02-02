@@ -80,8 +80,13 @@
 (defn round-prec [f digits]
   (-> f (.toFixed digits) (numberz)))
 
-(defn days-ms [n]
-  (* 24 60 60 1000 n))
+(def ms-per-day (* 24 60 60 1000))
+
+(defn days-ms [ds]
+  (* ms-per-day ds))
+
+(defn ms-days [ms]
+  (int (/ ms ms-per-day)))
 
 (defn day-name [n]
   (get ["SUN" "MON" "TUE" "WED" "THU" "FRI" "SAT"] n))
@@ -135,6 +140,16 @@
   (let [date0-ts ((if dmy? dmy-date mdy-date) ndate)
         date1-ts (+ date0-ts (days-ms days))]
     ((if dmy? ts-date-dmy ts-date-mdy) date1-ts)))
+
+(defn sub-dates [dmy? ndate-0 ndate-1]
+  (let [date-fn (if dmy? dmy-date mdy-date)
+        date0-ts (date-fn ndate-0)
+        date1-ts (date-fn ndate-1)]
+    (->
+     (- date1-ts date0-ts)
+     (ms-days)
+     (spy)
+     )))
 
 (defn backspace-handler []
   (swap! state
@@ -228,8 +243,22 @@
         (assoc :day dow)
         (spy))))
 
+(defn diff-dates-op [{:keys [flags operand-stack] :as state-info}]
+  (spy state-info)
+  (let [dmy? (= :dmy (:date-format flags))
+        ndate-1 (peekz operand-stack)
+        ndate-0 (peekz (pop operand-stack))
+        delta (sub-dates dmy? ndate-0 ndate-1)]
+    (log "ndate-0:" ndate-0 " ndate-1:" ndate-1 " delta:" delta)
+    (-> state-info
+        (update :operand-stack #(-> % (popz) (popz) (conjn delta)))
+        (spy))))
+
 (defn add-days-fn []
   (swap-state-fn #(update-state-result % add-days-op)))
+
+(defn diff-dates-fn []
+  (swap-state-fn #(update-state-result % diff-dates-op)))
 
 (defn swap-nop [_ _ stack]
   (let [rhs (peekz stack)
@@ -358,7 +387,8 @@
    :f-pct {:ftext "DB"  :mtext "%" :gtext "INTG"
            :nfn (op-fn acc-op percentage) :gfn (op-fn unary-op intg-part)}
    :f-eex {:ftext "ALG" :mtext "EEX" :gtext "ΔDYS"
-           :nfn (op-fn binary-op #(* %1 (Math/pow 10 %2)))}
+           :nfn (op-fn binary-op #(* %1 (Math/pow 10 %2)))
+           :gfn (diff-dates-fn)}
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY"
            :nfn (num-handler-fn 4) :ffn (set-precision-fn 4)
            :gfn (set-flag-fn :date-format :dmy)
