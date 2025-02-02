@@ -38,7 +38,7 @@
   text.sstext {font: 18px monospace; fill:black; stroke:black;}
   """ ])
 
-(defn state-fn [& args]
+(defn swap-state-fn [& args]
   #(apply swap! state args))
 
 (defn number [n]
@@ -173,18 +173,24 @@
   (cond-> stack
     (not (string/blank? raw-input)) (conjn (numberz raw-input))))
 
-(defn update-stack-result
-  [{:keys [raw-input] :as state-info} result-fn op]
+(defn update-state-result
+  [{:keys [raw-input] :as state-info} state-update-fn]
   (-> state-info
       (spy)
       (update :operand-stack push-input-value raw-input)
       (update-lastx)
-      (update :operand-stack (partial result-fn state-info op))
+      (state-update-fn)
       (assoc :raw-input "")
       (spy)))
 
+(defn update-stack-result
+  [state-info stack-update-fn op]
+  (update-state-result
+   state-info
+   #(update % :operand-stack (partial stack-update-fn state-info op))))
+
 (defn op-fn [upd-fn op]
-  (fn [] (swap! state #(update-stack-result % upd-fn op))))
+  (swap-state-fn #(update-stack-result % upd-fn op)))
 
 (defn unary-op [_ op stack]
   (let [result (op (peekz stack))]
@@ -200,7 +206,7 @@
         result (op lhs rhs)]
     (-> stack (popz) (conjn result))))
 
-(defn add-days-helper [{:keys [flags operand-stack] :as state-info}]
+(defn add-days-op [{:keys [flags operand-stack] :as state-info}]
   (spy state-info)
   (let [dmy? (= :dmy (:date-format flags))
         days (peekz operand-stack)
@@ -208,9 +214,12 @@
         _ (log "add helper days:" days " ndate-0:" ndate-0)
         [ndate-1 dow] (add-days dmy? ndate-0 days)]
     (-> state-info
-        (update-stack-result  #(-> % (popz) (popz) (conjn ndate-1)) nil)
+        (update :operand-stack #(-> % (popz) (popz) (conjn ndate-1)))
         (assoc :day dow)
         (spy))))
+
+(defn add-days-fn []
+  (swap-state-fn #(update-state-result % add-days-op)))
 
 (defn swap-nop [_ _ stack]
   (let [rhs (peekz stack)
@@ -314,7 +323,7 @@
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"
            :nfn (op-fn unary-op #(* -1 %))
-           :gfn (state-fn add-days-helper)}
+           :gfn (add-days-fn)}
    :n-7   {:ftext "" :mtext "7" :gtext "BEG"
            :nfn (num-handler-fn 7) :ffn (set-precision-fn 7)
            :sto (sto-fn 7) :rcl (rcl-fn 7)}
