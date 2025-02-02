@@ -3,7 +3,7 @@
          '[clojure.string :as string]
          '[cljs.pprint :as pprint])
 
-(defn log [& x] nil  (.log js/console (apply str x)))
+(defn log [& x] nil #_ (.log js/console (apply str x)))
 (defn spy [x] (log x) x)
 
 (def initial-state
@@ -77,6 +77,9 @@
 (defn pct-total [base part]
   (* (/ part base) 100.0))
 
+(defn round-prec [f digits]
+  (-> f (.toFixed digits) (numberz)))
+
 (defn days-ms [n]
   (* 24 60 60 1000 n))
 
@@ -84,7 +87,7 @@
   (get ["SUN" "MON" "TUE" "WED" "THU" "FRI" "SAT"] n))
 
 (defn day-num7 [n]
-  (get [1 2 3 4 5 6 7] n))
+  (str (get [7 1 2 3 4 5 6] n)))
 
 (defn ymd-str [y m d]
   (pprint/cl-format nil "~4,'0D-~2,'0D-~2,'0D" y m d))
@@ -117,7 +120,9 @@
   (let [dd (intg-part ndate)
         mmyyyy (* 100 (- ndate dd))
         mm (intg-part mmyyyy)
-        yyyy (intg-part (* 10000 (- mmyyyy mm)))]
+        _ (log "mmyyyy:" mmyyyy " mm:" mm )
+        yyyy (-> (* 10000 (- mmyyyy mm)) (round-prec 0) (int))]
+    (log "yyyy:" yyyy)
     (to-date-fn yyyy mm dd)))
 
 (defn dmy-date [ndate]
@@ -232,7 +237,7 @@
     (-> stack (popz) (popz) (conjn rhs) (conjn lhs))))
 
 (defn round-nop [{digits :display-precision} _ stack]
-  (let [result (-> (peekz stack) (numberz) (.toFixed digits))]
+  (let [result (-> (peekz stack) (numberz) (round-prec digits) )]
     (-> stack (popz) (conjn result))))
 
 (defn set-flag-fn [f v]
@@ -441,7 +446,7 @@
    [:text.stext {:x 1290 :y 40} (when (#{:f :g} shift) (name shift))]
    (when-let [day (get-day state-info)]
      [:g
-      [:text.mtext {:x 1230 :y 65} day]
+      [:text.mtext {:x 1230 :y 65} (day-num7 day)]
       [:text.sstext {:x 1270 :y 65} (day-name day)]])
    [:text.sstext {:x 1270 :y 40} (when (#{:sto :rcl} shift) (name shift))]
    [:text.sstext {:x 1270 :y 85} (when (= :dmy (:date-format flags)) "D.MY")]
