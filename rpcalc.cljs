@@ -11,8 +11,8 @@
    :raw-input ""
    :lastx 0.0
    :operand-stack [0.0]
-   :display-precision 4
-   :flags {:date-format :mdy :sci false}
+   :display-precision 8
+   :flags {:date-format :dmy :sci false}
    :shift :none
    :day nil
    :undo {}})
@@ -87,10 +87,14 @@
   (get [1 2 3 4 5 6 7] n))
 
 (defn ymd-str [y m d]
-  (pprint/cl-format "~4,0D-~2,0D-~2,0D" y m d))
+  (pprint/cl-format nil "~4,'0D-~2,'0D-~2,'0D" y m d))
 
 (defn ymd-date-ts [y m d]
-  (.UTC js/Date (ymd-str y m d)))
+  (->> (ymd-str y m d)
+       (spy)
+       (js/Date.)
+       (.valueOf)
+       (spy)))
 
 (defn ts-date [ts]
   (let [date (js/Date. ts)
@@ -102,18 +106,18 @@
 
 (defn ts-date-dmy [ts]
   (let [[y m d dow] (ts-date ts)]
-    [(+ d (/ m 100) (/ y 10000)) (day-num7 dow)]))
+    [(+ d (/ m 100) (/ y 1000000)) dow]))
 
 (defn ts-date-mdy [ts]
   (let [[y m d dow] (ts-date ts)]
-    [(+ m (/ d 100) (/ y 10000)) (day-num7 dow)]))
+    [(+ m (/ d 100) (/ y 1000000)) dow]))
 
 (defn parse-date [to-date-fn ndate]
   (log "parse-date ndate:" ndate)
   (let [dd (intg-part ndate)
         mmyyyy (* 100 (- ndate dd))
         mm (intg-part mmyyyy)
-        yyyy (* 10000 (- mmyyyy mm))]
+        yyyy (intg-part (* 10000 (- mmyyyy mm)))]
     (to-date-fn yyyy mm dd)))
 
 (defn dmy-date [ndate]
@@ -213,6 +217,7 @@
         ndate-0 (peekz (pop operand-stack))
         _ (log "add helper days:" days " ndate-0:" ndate-0)
         [ndate-1 dow] (add-days dmy? ndate-0 days)]
+    (log "day of week:" dow " ndate-1:" ndate-1)
     (-> state-info
         (update :operand-stack #(-> % (popz) (popz) (conjn ndate-1)))
         (assoc :day dow)
@@ -436,8 +441,8 @@
    [:text.stext {:x 1290 :y 40} (when (#{:f :g} shift) (name shift))]
    (when-let [day (get-day state-info)]
      [:g
-      [:text.mtext {:x 1270 :y 40} day]
-      [:text.sstext {:x 1270 :y 70} (day-name day)]])
+      [:text.mtext {:x 1230 :y 65} day]
+      [:text.sstext {:x 1270 :y 65} (day-name day)]])
    [:text.sstext {:x 1270 :y 40} (when (#{:sto :rcl} shift) (name shift))]
    [:text.sstext {:x 1270 :y 85} (when (= :dmy (:date-format flags)) "D.MY")]
    [:text.sstext {:x 1270 :y 105}  "RPN"]])
