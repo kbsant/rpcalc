@@ -109,6 +109,7 @@
     [(+ m (/ d 100) (/ y 10000)) (day-num7 dow)]))
 
 (defn parse-date [to-date-fn ndate]
+  (log "parse-date ndate:" ndate)
   (let [dd (intg-part ndate)
         mmyyyy (* 100 (- ndate dd))
         mm (intg-part mmyyyy)
@@ -125,15 +126,6 @@
   (let [date0-ts ((if dmy? dmy-date mdy-date) ndate)
         date1-ts (+ date0-ts (days-ms days))]
     ((if dmy? ts-date-dmy ts-date-mdy) date1-ts)))
-
-(defn add-days-helper [{:keys [flags operand-stack] :as state-info}]
-  (let [dmy? (= :dmy (:date-format flags))
-        days (peekz operand-stack)
-        ndate-0 (peekz (pop operand-stack))
-        [ndate-1 dow] (add-days dmy? ndate-0 days)]
-    (-> state-info
-        (update :operand-stack #(-> % (popz) (popz) (conjn ndate-1)))
-        (assoc :day dow))))
 
 (defn backspace-handler []
   (swap! state
@@ -207,6 +199,18 @@
         lhs (peekz (popz stack))
         result (op lhs rhs)]
     (-> stack (popz) (conjn result))))
+
+(defn add-days-helper [{:keys [flags operand-stack] :as state-info}]
+  (spy state-info)
+  (let [dmy? (= :dmy (:date-format flags))
+        days (peekz operand-stack)
+        ndate-0 (peekz (pop operand-stack))
+        _ (log "add helper days:" days " ndate-0:" ndate-0)
+        [ndate-1 dow] (add-days dmy? ndate-0 days)]
+    (-> state-info
+        (update-stack-result  #(-> % (popz) (popz) (conjn ndate-1)) nil)
+        (assoc :day dow)
+        (spy))))
 
 (defn swap-nop [_ _ stack]
   (let [rhs (peekz stack)
