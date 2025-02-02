@@ -8,7 +8,7 @@ A web-based rpn calculator.
 
 # Demo link
 
-Live demo on [github pages.](./rpcalc.html)
+Live demo on [github pages.](https://kbsant.github.io/rpcalc/rpcalc.html)
 	
 # Status
 
