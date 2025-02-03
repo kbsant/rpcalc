@@ -136,20 +136,38 @@
 (defn mdy-date [ndate]
   (parse-date #(ymd-date-ts %1 %3 %2) ndate))
 
-(defn add-days [dmy? ndate days]
-  (let [date0-ts ((if dmy? dmy-date mdy-date) ndate)
-        date1-ts (+ date0-ts (days-ms days))]
-    ((if dmy? ts-date-dmy ts-date-mdy) date1-ts)))
+(defn ndate-ts [dmy? ndate]
+  ((if dmy? dmy-date mdy-date) ndate))
 
-(defn sub-dates [dmy? ndate-0 ndate-1]
-  (let [date-fn (if dmy? dmy-date mdy-date)
-        date0-ts (date-fn ndate-0)
-        date1-ts (date-fn ndate-1)]
-    (->
-     (- date1-ts date0-ts)
-     (ms-days)
-     (spy)
-     )))
+(defn ts-ndate [dmy? date-ts]
+  ((if dmy? ts-date-dmy ts-date-mdy) date-ts))
+
+(defn add-days [date0-ts days]
+  (+ date0-ts (days-ms days)))
+
+(defn sub-dates [date0-ts date1-ts]
+  (-> (- date1-ts date0-ts)
+      (ms-days)
+      (spy)))
+
+(defn leap? [y]
+  (= 29 (.getDate (js/Date. y (dec 2) 29))))
+
+(defn adj-30-days [[y m d _]]
+  (cond
+    (> d 30) 30
+    (and (= 2 m) (= 29 d)) 30
+    (and (= 2 m) (= 28 d) (not (leap? y))) 30
+    :else d))
+
+(defn days-30-360 [date-ts]
+  (let [[y m _ _ :as ymdw] (ts-date date-ts)
+        _ (log "days-30-360 ymdw:" ymdw)
+        adj-days (adj-30-days ymdw)]
+    (-> y (* 12) (+ m) (* 30) (+ adj-days))))
+
+(defn sub-dates-30-360 [date0-ts date1-ts]
+  (- (days-30-360 date1-ts) (days-30-360 date0-ts)))
 
 (defn backspace-handler []
   (swap! state
@@ -234,9 +252,9 @@
   (spy state-info)
   (let [dmy? (= :dmy (:date-format flags))
         days (peekz operand-stack)
-        ndate-0 (peekz (pop operand-stack))
-        _ (log "add helper days:" days " ndate-0:" ndate-0)
-        [ndate-1 dow] (add-days dmy? ndate-0 days)]
+        date0-ts (ndate-ts dmy? (peekz (pop operand-stack)))
+        _ (log "add helper days:" days " date0-ts:" date0-ts)
+        [ndate-1 dow] (->> (add-days date0-ts days) (ts-ndate dmy?))]
     (log "day of week:" dow " ndate-1:" ndate-1)
     (-> state-info
         (update :operand-stack #(-> % (popz) (popz) (conjn ndate-1)))
@@ -246,11 +264,11 @@
 (defn diff-dates-op [{:keys [flags operand-stack] :as state-info}]
   (spy state-info)
   (let [dmy? (= :dmy (:date-format flags))
-        ndate-1 (peekz operand-stack)
-        ndate-0 (peekz (pop operand-stack))
-        delta (sub-dates dmy? ndate-0 ndate-1)
-        delta30 (dec delta)]
-    (log "ndate-0:" ndate-0 " ndate-1:" ndate-1 " delta:" delta)
+        date1-ts (ndate-ts dmy? (peekz operand-stack))
+        date0-ts (ndate-ts dmy? (peekz (pop operand-stack)))
+        delta (sub-dates date0-ts date1-ts)
+        delta30 (sub-dates-30-360 date0-ts date1-ts)]
+    (log "ndate-0:" date0-ts " ndate-1:" date1-ts " delta:" delta)
     (-> state-info
         (update :operand-stack
                 #(-> % (popz) (popz) (conjn delta30) (conjn delta)))
