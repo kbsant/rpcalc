@@ -160,14 +160,12 @@
     (and (= 2 m) (= 28 d) (not (leap? y))) 30
     :else d))
 
-(defn days-30-360 [date-ts]
-  (let [[y m _ _ :as ymdw] (ts-date date-ts)
-        _ (log "days-30-360 ymdw:" ymdw)
-        adj-days (adj-30-days ymdw)]
-    (-> y (* 12) (+ m) (* 30) (+ adj-days))))
-
 (defn sub-dates-30-360 [date0-ts date1-ts]
-  (- (days-30-360 date1-ts) (days-30-360 date0-ts)))
+  (let [[y0 m0 _ _ :as ymd0] (ts-date date0-ts)
+        [y1 m1 _ _ :as ymd1] (ts-date date1-ts)
+        adj-days0 (adj-30-days ymd0)
+        adj-days1 (adj-30-days ymd1)]
+    (-> (- y1 y0) (* 12) (+ (- m1 m0)) (* 30) (+ (- adj-days1 adj-days0)))))
 
 (defn backspace-handler []
   (swap! state
