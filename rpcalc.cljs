@@ -11,7 +11,7 @@
    :raw-input ""
    :lastx 0.0
    :operand-stack [0.0]
-   :rate-regs {:n 0 :i 0 :pv 0 :fv 0}
+   :rate-regs {:n nil :i nil :pv nil :fv nil}
    :display-precision 8
    :flags {:date-format :dmy :sci false}
    :shift :none
@@ -19,6 +19,12 @@
    :undo {}})
 
 (def state (r/atom initial-state))
+
+(def rate-regs-keys
+  (into #{} (keys (:rate-regs initial-state))))
+
+(defn rate-regs-ready? [regs k]
+  (every? regs (disj rate-regs-keys k)))
 
 (def svg-style
   [:style """
@@ -303,12 +309,15 @@
   (let [result (-> (peekz stack) (numberz) (round-prec digits) )]
     (-> stack (popz) (conjn result))))
 
-(defn rate-op-helper [k rate-op {r :raw-input stack :operand-stack :as state-info}]
-  (if (string/blank? r)
+(defn rate-op-helper
+  [k rate-op {:keys [raw-input rate-regs operand-stack] :as state-info}]
+  (if (and (string/blank? raw-input) (rate-regs-ready? rate-regs k))
     (let [result (numberz (rate-op state-info))]
-      (update state-info :operand-stack conjn result))
+      (-> state-info
+          (update :operand-stack conjn result)
+          (assoc-in [:rate-regs k] result)))
     (-> state-info
-        (assoc-in [:rate-regs k] (peekz stack)))))
+        (assoc-in [:rate-regs k] (peekz operand-stack)))))
 
 (defn rate-op-fn [k rate-op]
   (swap-state-fn
