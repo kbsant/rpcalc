@@ -11,6 +11,7 @@
    :raw-input ""
    :lastx 0.0
    :operand-stack [0.0]
+   :rate-regs {:n 0 :i 0 :pv 0 :fv 0}
    :display-precision 8
    :flags {:date-format :dmy :sci false}
    :shift :none
@@ -179,7 +180,7 @@
 (defn clx-reg-handler []
   (swap! state merge
          (select-keys initial-state
-                      [:raw-input :operand-stack :sto :lastx :day])))
+                      [:raw-input :operand-stack :rate-regs :sto :lastx :day])))
 
 (defn update-lastx [{stack :operand-stack :as state-info}]
   (assoc state-info :lastx (peekz stack)))
@@ -203,11 +204,12 @@
 (def max-digits-in 20)
 
 (defn num-handler-fn [n]
-  #(swap! state update :raw-input
-          (fn [r]
-            (if (< (count r) max-digits-in)
-              (str r n)
-              r))))
+  (swap-state-fn
+   update
+   :raw-input
+   #(if (< (count %) max-digits-in)
+      (str % n)
+      %)))
 
 (defn push-input-value [stack raw-input]
   (cond-> stack
@@ -287,25 +289,50 @@
   (let [result (-> (peekz stack) (numberz) (round-prec digits) )]
     (-> stack (popz) (conjn result))))
 
+(defn rate-op-helper [k rate-op {r :raw-input stack :operand-stack :as state-info}]
+  (if (string/blank? r)
+    (let [result (numberz (rate-op state-info))]
+      (update state-info :operand-stack conjn result))
+    (-> state-info
+        (assoc-in [:rate-regs k] (peekz stack))
+        (update :operand-stack popz))))
+
+(defn rate-op-fn [k rate-op]
+  (swap-state-fn
+   #(update-state-result % (partial rate-op-helper k rate-op))))
+
+
+(defn rate-i-op [{regs :rate-regs}]
+  1)
+
+(defn rate-n-op [{regs :rate-regs}]
+  1)
+
+(defn rate-pv-op [{regs :rate-regs}]
+  (let [{:keys [n i fv]} regs]
+    (* (- fv) (Math/pow  (+ 1.0 (/ i 100)) (- n)))))
+
+(defn rate-fv-op [{regs :rate-regs}]
+  (let [{:keys [n i pv]} regs]
+    (* (- pv) (Math/pow  (+ 1.0 (/ i 100)) n))))
+
 (defn set-flag-fn [f v]
-  (fn [] (swap! state #(assoc-in % [:flags f] v))))
+  (swap-state-fn #(assoc-in % [:flags f] v)))
 
 (defn toggle-flag-fn [f]
-  (fn [] (swap! state #(update-in % [:flags f] not))))
+   (swap-state-fn #(update-in % [:flags f] not)))
 
 (defn toggle-shift-fn [s]
-  (fn [] (swap! state #(update % :shift (fn [e] (if (= s e) :none s))))))
+  (swap-state-fn #(update % :shift (fn [e] (if (= s e) :none s)))))
 
 (defn set-precision-fn [n]
-  (fn [] (swap!
-          state
-          #(-> %
-               (assoc :display-precision n :shift :none)
-               (assoc-in [:flags :sci] false)))))
+  (swap-state-fn
+   #(-> %
+        (assoc :display-precision n :shift :none)
+        (assoc-in [:flags :sci] false))))
 
 (defn sto-fn [n]
-  #(swap!
-    state
+  (swap-state-fn
     (fn
       [{:keys [raw-input sto-op] :as state-info}]
       (as-> state-info s
@@ -318,16 +345,15 @@
         (spy s)))))
 
 (defn rcl-fn [n]
-  #(swap!
-    state
-    (fn
-      [{:keys [sto] :as state-info}]
-      (let [d (get sto n)]
-        (-> state-info
-            (spy)
-            (update :operand-stack conjn d)
-            (assoc :raw-input "" :lastx d)
-            (spy))))))
+  (swap-state-fn
+   (fn
+     [{:keys [sto] :as state-info}]
+     (let [d (get sto n)]
+       (-> state-info
+           (spy)
+           (update :operand-stack conjn d)
+           (assoc :raw-input "" :lastx d)
+           (spy))))))
 
 (defn lastx-handler []
   (swap!
@@ -372,12 +398,16 @@
      [:text {:x (x-fn mtext) :y (+ 90 y) } mtext]]))
 
 (def btn-info
-  {:f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"}
-   :f-i   {:ftext "INT" :mtext "i" :gtext "12÷"}
-   :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"}
+  {:f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"
+           :nfn (rate-op-fn :n rate-n-op)}
+   :f-i   {:ftext "INT" :mtext "i" :gtext "12÷"
+           :nfn (rate-op-fn :i rate-i-op)}
+   :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"
+           :nfn (rate-op-fn :pv rate-pv-op)}
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"
            :ffn (op-fn round-nop 1)}
-   :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"}
+   :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"
+           :nfn (rate-op-fn :fv rate-fv-op)}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"
            :nfn (op-fn unary-op #(* -1 %))
            :gfn (add-days-fn)}
