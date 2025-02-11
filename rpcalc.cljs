@@ -45,6 +45,15 @@
 (defn number [n]
   (js/Number. n))
 
+(defn chs [n]
+  (* -1 n))
+
+(defn chs-str [[a & _ :as s]]
+  (cond
+    (= "" a)  ""
+    (= "-" a) (subs s 1)
+    :else     (str "-" s)))
+
 (defn peekz [stack]
   (or (peek stack) 0.0))
 
@@ -65,7 +74,7 @@
   (reduce * (range 1 (inc n))))
 
 (defn frac-part [d]
-  (- d  (Math/trunc d)))
+  (- d (Math/trunc d)))
 
 (def intg-part Math/trunc)
 
@@ -248,6 +257,11 @@
         result (op lhs rhs)]
     (-> stack (popz) (conjn result))))
 
+(defn chs-op-fn [{r :raw-input :as state-info}]
+  (if (string/blank? r)
+    (update-stack-result state-info unary-op chs)
+    (update state-info :raw-input chs-str)))
+
 (defn add-days-op [{:keys [flags operand-stack] :as state-info}]
   (spy state-info)
   (let [dmy? (= :dmy (:date-format flags))
@@ -294,13 +308,11 @@
     (let [result (numberz (rate-op state-info))]
       (update state-info :operand-stack conjn result))
     (-> state-info
-        (assoc-in [:rate-regs k] (peekz stack))
-        (update :operand-stack popz))))
+        (assoc-in [:rate-regs k] (peekz stack)))))
 
 (defn rate-op-fn [k rate-op]
   (swap-state-fn
    #(update-state-result % (partial rate-op-helper k rate-op))))
-
 
 (defn rate-i-op [{regs :rate-regs}]
   1)
@@ -309,12 +321,14 @@
   1)
 
 (defn rate-pv-op [{regs :rate-regs}]
+  (log "rate-pv-op" regs)
   (let [{:keys [n i fv]} regs]
-    (* (- fv) (Math/pow  (+ 1.0 (/ i 100)) (- n)))))
+    (* -1 fv (Math/pow (+ 1.0 (/ i 100)) (* -1 n)))))
 
 (defn rate-fv-op [{regs :rate-regs}]
+  (log "rate-fv-op" regs)
   (let [{:keys [n i pv]} regs]
-    (* (- pv) (Math/pow  (+ 1.0 (/ i 100)) n))))
+    (* -1 pv (Math/pow (+ 1.0 (/ i 100)) n))))
 
 (defn set-flag-fn [f v]
   (swap-state-fn #(assoc-in % [:flags f] v)))
@@ -409,7 +423,7 @@
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"
            :nfn (rate-op-fn :fv rate-fv-op)}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"
-           :nfn (op-fn unary-op #(* -1 %))
+           :nfn (swap-state-fn chs-op-fn)
            :gfn (add-days-fn)}
    :n-7   {:ftext "" :mtext "7" :gtext "BEG"
            :nfn (num-handler-fn 7) :ffn (set-precision-fn 7)
