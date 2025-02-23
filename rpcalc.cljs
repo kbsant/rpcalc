@@ -30,8 +30,10 @@
   [:style """
   .frame {fill: rgb(0,20,40)}
   .lcdisplay rect {fill: rgb(120,140,120)}
-  .fg-btn {font-family: sans-serif; fill:white;}
-  .fg-btn rect {fill: black; stroke: gold;}
+  g rect.pane {fill: black; opacity: 0%; stroke: none;}
+  .fg-btn text {font-family: sans-serif; fill:white;}
+  .fg-btn rect.fg-rect {fill: black; stroke: gold;}
+  .fg-btn text.ftext {font-size: 18px;stroke:orange;}
   .fg-btn text.ftext {font-size: 18px;stroke:orange;}
   .fg-btn text.mtext {font-size: 22px;stroke:white;}
   .fg-btn text.gtext {font-size: 20px;stroke:dodgerblue;}
@@ -406,19 +408,22 @@
 (defn btn
   [{:keys [x y height ftext mtext gtext] :or {height 80} :as btn-info}]
   (let [x-fn #(- (+ x 20) (* 5 (count %)))
-        click-fn #(dispatch-btn btn-info)]
+        click-fn #(dispatch-btn btn-info)
+        rect-bounds {:x (- x 20) :y (+ 40 y) :width 90 :height height}]
     [:g.fg-btn
-     [:text.ftext {:x (x-fn ftext) :y (+ 30 y) } ftext]
-     [:rect
-      {:on-click click-fn :x (- x 20) :y (+ 40 y) :width 90 :height height}]
-     [:text.mtext {:x (x-fn mtext) :y (+ 80 y) } mtext]
-     [:text.gtext {:x (x-fn gtext) :y (+ height 35 y) } gtext]]))
+     [:text.ftext {:x (x-fn ftext) :y (+ 30 y)} ftext]
+     [:rect.fg-rect rect-bounds]
+     [:text.mtext {:x (x-fn mtext) :y (+ 80 y)} mtext]
+     [:text.gtext {:x (x-fn gtext) :y (+ height 35 y)} gtext]
+     [:rect.pane (assoc rect-bounds :on-click click-fn)]]))
 
 (defn shift-btn [{:keys [x y mtext shiftfn rect-class]}]
-  (let [x-fn #(- (+ x 20) (* 5 (count %)))]
+  (let [x-fn #(- (+ x 20) (* 5 (count %)))
+        rect-bounds {:x (- x 20) :y (+ 40 y) :width 90 :height 80}]
     [:g.sh-btn
-     [rect-class {:on-click shiftfn :x (- x 20) :y (+ 40 y) :width 90 :height 80}]
-     [:text {:x (x-fn mtext) :y (+ 90 y) } mtext]]))
+     [rect-class rect-bounds]
+     [:text {:x (x-fn mtext) :y (+ 90 y) } mtext]
+     [:rect.pane (assoc rect-bounds :on-click shiftfn)]]))
 
 (def btn-info
   {:f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"
