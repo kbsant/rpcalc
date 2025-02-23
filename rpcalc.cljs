@@ -251,6 +251,10 @@
 (defn op-fn [upd-fn op]
   (swap-state-fn #(update-stack-result % upd-fn op)))
 
+(defn stack-rotate-op [_ _ stack]
+  (let [x (peekz stack)]
+    (into [x] (popz stack))))
+
 (defn unary-op [_ op stack]
   (let [result (op (peekz stack))]
     (-> stack (popz) (conjn result))))
@@ -482,7 +486,8 @@
            :stofn (constantly nil)}
    :f-rs  {:ftext "P/R" :mtext "R/S" :gtext "PSE"}
    :f-sst {:ftext "Σ" :mtext "SST" :gtext "BST"}
-   :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"}
+   :f-run {:ftext "PRGM" :mtext "R↓" :gtext "GTO"
+           :nfn (op-fn stack-rotate-op identity)}
    :f-x-y {:ftext "FIN" :mtext "x≷y" :gtext "x≤y"
            :nfn (op-fn swap-nop 1)}
    :f-clx {:ftext "REG"  :mtext "CLx" :gtext "x=0"
