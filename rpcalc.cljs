@@ -373,16 +373,17 @@
         (assoc s :raw-input "" :sto-op nil)
         (spy s)))))
 
-(defn rcl-fn [n]
-  (swap-state-fn
-   (fn
-     [{:keys [sto] :as state-info}]
-     (let [d (get sto n)]
-       (-> state-info
+(defn update-state-recall [state-info v]
+  (-> state-info
            (spy)
-           (update :operand-stack conjn d)
-           (assoc :raw-input "" :lastx d)
-           (spy))))))
+           (update :operand-stack conjn v)
+           (assoc :raw-input "" :lastx v)
+           (spy)))
+
+(defn rcl-fn [& key-vec]
+  (swap-state-fn
+   (fn [state-info]
+     (update-state-recall state-info (get-in state-info key-vec 0)))))
 
 (defn lastx-handler []
   (swap!
@@ -431,27 +432,27 @@
 
 (def btn-info
   {:f-n   {:ftext "AMORT" :mtext "n" :gtext "12x"
-           :nfn (rate-op-fn :n rate-n-op)}
+           :nfn (rate-op-fn :n rate-n-op) :rcl (rcl-fn :rate-regs :n)}
    :f-i   {:ftext "INT" :mtext "i" :gtext "12÷"
-           :nfn (rate-op-fn :i rate-i-op)}
+           :nfn (rate-op-fn :i rate-i-op) :rcl (rcl-fn :rate-regs :i)}
    :f-pv  {:ftext "NPV" :mtext "PV" :gtext "CFo"
-           :nfn (rate-op-fn :pv rate-pv-op)}
+           :nfn (rate-op-fn :pv rate-pv-op) :rcl (rcl-fn :rate-regs :pv)}
    :f-pmt {:ftext "RND" :mtext "PMT" :gtext "CFj"
-           :ffn (op-fn round-nop 1)}
+           :ffn (op-fn round-nop 1) :rcl (rcl-fn :rate-regs :pmt)}
    :f-fv  {:ftext "IRR" :mtext "FV" :gtext "Nj"
-           :nfn (rate-op-fn :fv rate-fv-op)}
+           :nfn (rate-op-fn :fv rate-fv-op) :rcl (rcl-fn :rate-regs :fv)}
    :f-chs {:ftext "RPN" :mtext "CHS" :gtext "DATE"
            :nfn (swap-state-fn chs-op-fn)
            :gfn (add-days-fn)}
    :n-7   {:ftext "" :mtext "7" :gtext "BEG"
            :nfn (num-handler-fn 7) :ffn (set-precision-fn 7)
-           :sto (sto-fn 7) :rcl (rcl-fn 7)}
+           :sto (sto-fn 7) :rcl (rcl-fn :sto 7)}
    :n-8   {:ftext "" :mtext "8" :gtext "END"
            :nfn (num-handler-fn 8) :ffn (set-precision-fn 8)
-           :sto (sto-fn 8) :rcl (rcl-fn 8)}
+           :sto (sto-fn 8) :rcl (rcl-fn :sto 8)}
    :n-9   {:ftext "" :mtext "9" :gtext "MEM"
            :nfn (num-handler-fn 9) :ffn (set-precision-fn 9)
-           :sto (sto-fn 9) :rcl (rcl-fn 9)}
+           :sto (sto-fn 9) :rcl (rcl-fn :sto 9)}
    :n-div {:ftext "" :mtext "÷" :gtext "⤶"
            :nfn (op-fn binary-op /)
            :sto #(swap! state assoc :sto-op /)
@@ -472,14 +473,14 @@
    :n-4   {:ftext "" :mtext "4" :gtext "D.MY"
            :nfn (num-handler-fn 4) :ffn (set-precision-fn 4)
            :gfn (set-flag-fn :date-format :dmy)
-           :sto (sto-fn 4) :rcl (rcl-fn 4)}
+           :sto (sto-fn 4) :rcl (rcl-fn :sto 4)}
    :n-5   {:ftext "" :mtext "5" :gtext "M.DY"
            :nfn (num-handler-fn 5) :ffn (set-precision-fn 5)
            :gfn (set-flag-fn :date-format :mdy) :sto (sto-fn 5)
-           :rcl (rcl-fn 5)}
+           :rcl (rcl-fn :sto 5)}
    :n-6   {:ftext "" :mtext "6" :gtext "x̄w"
            :nfn (num-handler-fn 6) :ffn (set-precision-fn 6)
-           :sto (sto-fn 6) :rcl (rcl-fn 6)}
+           :sto (sto-fn 6) :rcl (rcl-fn :sto 6)}
    :n-mul {:ftext "" :mtext "x" :gtext "x²"
            :nfn (op-fn binary-op *) :gfn (op-fn unary-op #(* % %))
            :sto #(swap! state assoc :sto-op *)
@@ -496,14 +497,14 @@
             :height 220 :nfn enter-handler}
    :n-1   {:ftext "" :mtext "1" :gtext "x̂,r"
            :nfn (num-handler-fn 1) :ffn (set-precision-fn 1)
-           :sto (sto-fn 1) :rcl (rcl-fn 1)}
+           :sto (sto-fn 1) :rcl (rcl-fn :sto 1)}
    :n-2   {:ftext "" :mtext "2" :gtext "ŷ,r"
            :nfn (num-handler-fn 2) :ffn (set-precision-fn 2)
-           :sto (sto-fn 2) :rcl (rcl-fn 2)}
+           :sto (sto-fn 2) :rcl (rcl-fn :sto 2)}
    :n-3   {:ftext "" :mtext "3" :gtext "n!"
            :nfn (num-handler-fn 3) :ffn (set-precision-fn 3)
            :gfn (op-fn unary-op factorial)
-           :sto (sto-fn 3) :rcl (rcl-fn 3)}
+           :sto (sto-fn 3) :rcl (rcl-fn :sto 3)}
    :n-sub {:ftext "" :mtext "-" :gtext "←"
            :nfn (op-fn binary-op -) :gfn backspace-handler
            :sto #(swap! state assoc :sto-op -)
@@ -520,7 +521,7 @@
    :f-nop {:draw-fn #(vector :g)}
    :n-0   {:ftext "" :mtext "0" :gtext "x̄"
            :nfn (num-handler-fn 0) :ffn (set-precision-fn 0)
-           :sto (sto-fn 0) :rcl (rcl-fn 0)}
+           :sto (sto-fn 0) :rcl (rcl-fn :sto 0)}
    :n-d   {:ftext "" :mtext "." :gtext "S"
            :nfn decimal-pt-handler :ffn (toggle-flag-fn :sci)}
    :n-S   {:ftext "" :mtext "Σ+" :gtext "Σ-"}
