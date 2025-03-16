@@ -330,10 +330,16 @@
    #(update-state-result % (partial rate-op-helper k rate-op))))
 
 (defn rate-i-op [{regs :rate-regs}]
-  1)
+  (log "rate-i-op" regs)
+  (let [{:keys [n pv fv]} regs]
+    (-> (/ fv pv) (Math/abs) (Math/pow (/ 1 n)) (- 1) (* 100))))
 
 (defn rate-n-op [{regs :rate-regs}]
-  1)
+  (log "rate-n-op" regs)
+  (let [{:keys [i pv fv]} regs
+        log-fv-pv (-> (/ fv pv) (Math/abs) (Math/log))
+        log-r (-> (/ i 100) (+ 1) (Math/log))]
+    (/ log-fv-pv log-r)))
 
 (defn rate-pv-op [{regs :rate-regs}]
   (log "rate-pv-op" regs)
